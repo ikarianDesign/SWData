@@ -1,0 +1,477 @@
+{
+  "patient": {
+    "id": "TM-001",
+    "name": "Tyler M.",
+    "age": 27,
+    "occupation": "Soldier",
+    "injury": "Closed distal radius fracture",
+    "treatment": "Closed reduction and casting",
+    "castRemovalDate": "2024-01-08",
+    "therapyStartWeek": 6,
+    "therapyEndWeek": 26,
+    "outcome": "Cleared for return to duty"
+  },
+  "gestures": {
+    "extension": { "label": "Extension",   "color": "#378ADD", "introducedWeek": 6  },
+    "hook":      { "label": "Hook",        "color": "#D4537E", "introducedWeek": 6  },
+    "tabletop":  { "label": "Tabletop",    "color": "#1D9E75", "introducedWeek": 8  },
+    "closed":    { "label": "Closed Fist", "color": "#BA7517", "introducedWeek": 12 },
+    "flat":      { "label": "Flat Fist",   "color": "#7F77DD", "introducedWeek": 22 }
+  },
+  "sessions": [
+    {
+      "date": "2024-01-08", "week": 6, "dayOfWeek": 1,
+      "pain": 7, "minutes": 8,
+      "note": "First session — calibration day.",
+      "gestures": {
+        "extension": { "hits": 6,  "attempts": 20 },
+        "hook":      { "hits": 5,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-01-10", "week": 6, "dayOfWeek": 3,
+      "pain": 6, "minutes": 10,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 8,  "attempts": 20 },
+        "hook":      { "hits": 7,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-01-12", "week": 6, "dayOfWeek": 5,
+      "pain": 7, "minutes": 9,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 9,  "attempts": 20 },
+        "hook":      { "hits": 8,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-01-15", "week": 7, "dayOfWeek": 1,
+      "pain": 6, "minutes": 11,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 10, "attempts": 20 },
+        "hook":      { "hits": 9,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-01-18", "week": 7, "dayOfWeek": 4,
+      "pain": 5, "minutes": 12,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 11, "attempts": 20 },
+        "hook":      { "hits": 10, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-01-22", "week": 8, "dayOfWeek": 1,
+      "pain": 6, "minutes": 13,
+      "note": "Tabletop introduced.",
+      "gestures": {
+        "extension": { "hits": 10, "attempts": 20 },
+        "hook":      { "hits": 10, "attempts": 20 },
+        "tabletop":  { "hits": 5,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-01-24", "week": 8, "dayOfWeek": 3,
+      "pain": 5, "minutes": 14,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 11, "attempts": 20 },
+        "hook":      { "hits": 11, "attempts": 20 },
+        "tabletop":  { "hits": 6,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-01-27", "week": 8, "dayOfWeek": 6,
+      "pain": 6, "minutes": 13,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 12, "attempts": 20 },
+        "hook":      { "hits": 10, "attempts": 20 },
+        "tabletop":  { "hits": 7,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-01-30", "week": 9, "dayOfWeek": 2,
+      "pain": 8, "minutes": 10,
+      "note": "Pain spike — overuse reported.",
+      "gestures": {
+        "extension": { "hits": 9,  "attempts": 20 },
+        "hook":      { "hits": 8,  "attempts": 20 },
+        "tabletop":  { "hits": 5,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-02-08", "week": 10, "dayOfWeek": 1,
+      "pain": 6, "minutes": 12,
+      "note": "9-day gap (rest period).",
+      "gestures": {
+        "extension": { "hits": 11, "attempts": 20 },
+        "hook":      { "hits": 10, "attempts": 20 },
+        "tabletop":  { "hits": 8,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-02-11", "week": 10, "dayOfWeek": 4,
+      "pain": 5, "minutes": 14,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 12, "attempts": 20 },
+        "hook":      { "hits": 11, "attempts": 20 },
+        "tabletop":  { "hits": 9,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-02-15", "week": 11, "dayOfWeek": 2,
+      "pain": 4, "minutes": 15,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 13, "attempts": 20 },
+        "hook":      { "hits": 12, "attempts": 20 },
+        "tabletop":  { "hits": 10, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-02-18", "week": 11, "dayOfWeek": 5,
+      "pain": 4, "minutes": 16,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 14, "attempts": 20 },
+        "hook":      { "hits": 13, "attempts": 20 },
+        "tabletop":  { "hits": 11, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-02-22", "week": 12, "dayOfWeek": 1,
+      "pain": 4, "minutes": 17,
+      "note": "Closed Fist introduced.",
+      "gestures": {
+        "extension": { "hits": 14, "attempts": 20 },
+        "hook":      { "hits": 13, "attempts": 20 },
+        "tabletop":  { "hits": 12, "attempts": 20 },
+        "closed":    { "hits": 5,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-02-25", "week": 12, "dayOfWeek": 4,
+      "pain": 4, "minutes": 18,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 15, "attempts": 20 },
+        "hook":      { "hits": 14, "attempts": 20 },
+        "tabletop":  { "hits": 12, "attempts": 20 },
+        "closed":    { "hits": 6,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-02-29", "week": 13, "dayOfWeek": 1,
+      "pain": 3, "minutes": 18,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 15, "attempts": 20 },
+        "hook":      { "hits": 14, "attempts": 20 },
+        "tabletop":  { "hits": 13, "attempts": 20 },
+        "closed":    { "hits": 7,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-03-02", "week": 13, "dayOfWeek": 3,
+      "pain": 3, "minutes": 19,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 16, "attempts": 20 },
+        "hook":      { "hits": 15, "attempts": 20 },
+        "tabletop":  { "hits": 13, "attempts": 20 },
+        "closed":    { "hits": 8,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-03-05", "week": 13, "dayOfWeek": 6,
+      "pain": 4, "minutes": 17,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 15, "attempts": 20 },
+        "hook":      { "hits": 14, "attempts": 20 },
+        "tabletop":  { "hits": 13, "attempts": 20 },
+        "closed":    { "hits": 7,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-03-08", "week": 14, "dayOfWeek": 2,
+      "pain": 3, "minutes": 19,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 16, "attempts": 20 },
+        "hook":      { "hits": 15, "attempts": 20 },
+        "tabletop":  { "hits": 14, "attempts": 20 },
+        "closed":    { "hits": 9,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-03-11", "week": 14, "dayOfWeek": 5,
+      "pain": 3, "minutes": 20,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 17, "attempts": 20 },
+        "hook":      { "hits": 16, "attempts": 20 },
+        "tabletop":  { "hits": 15, "attempts": 20 },
+        "closed":    { "hits": 10, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-03-15", "week": 15, "dayOfWeek": 2,
+      "pain": 3, "minutes": 20,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 17, "attempts": 20 },
+        "hook":      { "hits": 16, "attempts": 20 },
+        "tabletop":  { "hits": 15, "attempts": 20 },
+        "closed":    { "hits": 11, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-03-18", "week": 15, "dayOfWeek": 5,
+      "pain": 2, "minutes": 21,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 18, "attempts": 20 },
+        "hook":      { "hits": 17, "attempts": 20 },
+        "tabletop":  { "hits": 16, "attempts": 20 },
+        "closed":    { "hits": 12, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-03-22", "week": 16, "dayOfWeek": 2,
+      "pain": 3, "minutes": 20,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 17, "attempts": 20 },
+        "hook":      { "hits": 17, "attempts": 20 },
+        "tabletop":  { "hits": 15, "attempts": 20 },
+        "closed":    { "hits": 11, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-03-25", "week": 17, "dayOfWeek": 1,
+      "pain": 6, "minutes": 11,
+      "note": "Pain spike — duty-related strain.",
+      "gestures": {
+        "extension": { "hits": 14, "attempts": 20 },
+        "hook":      { "hits": 13, "attempts": 20 },
+        "tabletop":  { "hits": 12, "attempts": 20 },
+        "closed":    { "hits": 8,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-04-04", "week": 18, "dayOfWeek": 2,
+      "pain": 4, "minutes": 15,
+      "note": "10-day gap.",
+      "gestures": {
+        "extension": { "hits": 15, "attempts": 20 },
+        "hook":      { "hits": 14, "attempts": 20 },
+        "tabletop":  { "hits": 13, "attempts": 20 },
+        "closed":    { "hits": 10, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-04-07", "week": 18, "dayOfWeek": 5,
+      "pain": 3, "minutes": 17,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 16, "attempts": 20 },
+        "hook":      { "hits": 15, "attempts": 20 },
+        "tabletop":  { "hits": 14, "attempts": 20 },
+        "closed":    { "hits": 11, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-04-11", "week": 19, "dayOfWeek": 1,
+      "pain": 3, "minutes": 19,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 17, "attempts": 20 },
+        "hook":      { "hits": 16, "attempts": 20 },
+        "tabletop":  { "hits": 15, "attempts": 20 },
+        "closed":    { "hits": 12, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-04-13", "week": 19, "dayOfWeek": 3,
+      "pain": 2, "minutes": 20,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 18, "attempts": 20 },
+        "hook":      { "hits": 17, "attempts": 20 },
+        "tabletop":  { "hits": 16, "attempts": 20 },
+        "closed":    { "hits": 13, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-04-16", "week": 19, "dayOfWeek": 6,
+      "pain": 2, "minutes": 21,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 18, "attempts": 20 },
+        "hook":      { "hits": 17, "attempts": 20 },
+        "tabletop":  { "hits": 16, "attempts": 20 },
+        "closed":    { "hits": 14, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-04-19", "week": 20, "dayOfWeek": 2,
+      "pain": 2, "minutes": 22,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 19, "attempts": 20 },
+        "hook":      { "hits": 18, "attempts": 20 },
+        "tabletop":  { "hits": 17, "attempts": 20 },
+        "closed":    { "hits": 15, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-04-22", "week": 20, "dayOfWeek": 5,
+      "pain": 2, "minutes": 22,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 19, "attempts": 20 },
+        "hook":      { "hits": 18, "attempts": 20 },
+        "tabletop":  { "hits": 17, "attempts": 20 },
+        "closed":    { "hits": 15, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-04-26", "week": 21, "dayOfWeek": 2,
+      "pain": 2, "minutes": 22,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 19, "attempts": 20 },
+        "hook":      { "hits": 18, "attempts": 20 },
+        "tabletop":  { "hits": 17, "attempts": 20 },
+        "closed":    { "hits": 16, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-04-29", "week": 22, "dayOfWeek": 1,
+      "pain": 2, "minutes": 23,
+      "note": "Flat Fist introduced.",
+      "gestures": {
+        "extension": { "hits": 19, "attempts": 20 },
+        "hook":      { "hits": 18, "attempts": 20 },
+        "tabletop":  { "hits": 18, "attempts": 20 },
+        "closed":    { "hits": 16, "attempts": 20 },
+        "flat":      { "hits": 5,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-05-02", "week": 22, "dayOfWeek": 4,
+      "pain": 2, "minutes": 23,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 19, "attempts": 20 },
+        "hook":      { "hits": 19, "attempts": 20 },
+        "tabletop":  { "hits": 18, "attempts": 20 },
+        "closed":    { "hits": 16, "attempts": 20 },
+        "flat":      { "hits": 6,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-05-06", "week": 23, "dayOfWeek": 1,
+      "pain": 2, "minutes": 24,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 20, "attempts": 20 },
+        "hook":      { "hits": 19, "attempts": 20 },
+        "tabletop":  { "hits": 18, "attempts": 20 },
+        "closed":    { "hits": 17, "attempts": 20 },
+        "flat":      { "hits": 8,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-05-09", "week": 23, "dayOfWeek": 4,
+      "pain": 1, "minutes": 24,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 20, "attempts": 20 },
+        "hook":      { "hits": 19, "attempts": 20 },
+        "tabletop":  { "hits": 19, "attempts": 20 },
+        "closed":    { "hits": 17, "attempts": 20 },
+        "flat":      { "hits": 9,  "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-05-13", "week": 24, "dayOfWeek": 1,
+      "pain": 1, "minutes": 25,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 20, "attempts": 20 },
+        "hook":      { "hits": 19, "attempts": 20 },
+        "tabletop":  { "hits": 19, "attempts": 20 },
+        "closed":    { "hits": 18, "attempts": 20 },
+        "flat":      { "hits": 11, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-05-16", "week": 24, "dayOfWeek": 4,
+      "pain": 1, "minutes": 25,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 20, "attempts": 20 },
+        "hook":      { "hits": 20, "attempts": 20 },
+        "tabletop":  { "hits": 19, "attempts": 20 },
+        "closed":    { "hits": 18, "attempts": 20 },
+        "flat":      { "hits": 12, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-05-21", "week": 25, "dayOfWeek": 2,
+      "pain": 1, "minutes": 25,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 20, "attempts": 20 },
+        "hook":      { "hits": 20, "attempts": 20 },
+        "tabletop":  { "hits": 20, "attempts": 20 },
+        "closed":    { "hits": 19, "attempts": 20 },
+        "flat":      { "hits": 14, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-05-24", "week": 25, "dayOfWeek": 5,
+      "pain": 1, "minutes": 26,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 20, "attempts": 20 },
+        "hook":      { "hits": 20, "attempts": 20 },
+        "tabletop":  { "hits": 20, "attempts": 20 },
+        "closed":    { "hits": 19, "attempts": 20 },
+        "flat":      { "hits": 15, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-05-29", "week": 26, "dayOfWeek": 2,
+      "pain": 1, "minutes": 26,
+      "note": "",
+      "gestures": {
+        "extension": { "hits": 20, "attempts": 20 },
+        "hook":      { "hits": 20, "attempts": 20 },
+        "tabletop":  { "hits": 20, "attempts": 20 },
+        "closed":    { "hits": 20, "attempts": 20 },
+        "flat":      { "hits": 16, "attempts": 20 }
+      }
+    },
+    {
+      "date": "2024-06-01", "week": 26, "dayOfWeek": 5,
+      "pain": 1, "minutes": 27,
+      "note": "Final assessment — cleared for return to duty.",
+      "gestures": {
+        "extension": { "hits": 20, "attempts": 20 },
+        "hook":      { "hits": 20, "attempts": 20 },
+        "tabletop":  { "hits": 20, "attempts": 20 },
+        "closed":    { "hits": 20, "attempts": 20 },
+        "flat":      { "hits": 17, "attempts": 20 }
+      }
+    }
+  ]
+}
