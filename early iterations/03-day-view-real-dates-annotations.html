@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignWave 03 — Day view, real dates, annotations</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #f5f5f4; padding: 24px; color: #1a1916; }
+h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.meta { font-size: 12px; color: #888; margin-bottom: 16px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.seg { display: flex; border: 0.5px solid #ccc; border-radius: 6px; overflow: hidden; }
+.seg button { background: transparent; border: none; border-right: 0.5px solid #ccc; padding: 5px 12px; font-size: 12px; color: #666; cursor: pointer; }
+.seg button:last-child { border-right: none; }
+.seg button.act { background: #1a1916; color: #fff; }
+select { font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ccc; }
+.slabel { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing:.04em; margin-bottom: 5px; margin-top: 14px; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.li { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #555; }
+.ld { width: 12px; height: 3px; border-radius: 1px; }
+.scroll { overflow-x: auto; }
+.scroll::-webkit-scrollbar { height: 3px; }
+.scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+.chart-wrap { position: relative; }
+.annot-outer { overflow-x: auto; }
+.annot-inner { position: relative; height: 28px; }
+.ann-chip { position: absolute; top: 3px; height: 22px; border-radius: 4px; display: flex; align-items: center; padding: 0 7px; font-size: 10px; font-weight: 600; white-space: nowrap; border: 0.5px solid; }
+.ann-chip.pain { background:#FCEBEB; color:#791F1F; border-color:#F09595; }
+.ann-chip.gap  { background:#FAEEDA; color:#633806; border-color:#EF9F27; }
+.ann-leg { display: flex; gap: 12px; margin-bottom: 4px; }
+.ann-li { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #666; }
+.ann-dot { width: 8px; height: 8px; border-radius: 2px; }
+.fn { font-size: 11px; color: #aaa; margin-top: 10px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.mk { display: flex; align-items: center; gap: 4px; }
+.sw { width: 10px; height: 10px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<h1>SignWave Exploration 03</h1>
+<p class="meta">Day toggle shows every calendar day — rest days appear as empty slots. Real calendar dates. Annotation lane detects pain spikes (+3 pts) and gaps (3+ days). All lanes scroll in sync.</p>
+
+<div class="controls">
+  <div class="seg" id="viewSeg">
+    <button class="act" onclick="setGran('day',this)">Day</button>
+    <button onclick="setGran('week',this)">Week</button>
+    <button onclick="setGran('month',this)">Month</button>
+  </div>
+  <div class="seg" id="axisSeg">
+    <button class="act" onclick="setAxis('week',this)">W+0</button>
+    <button onclick="setAxis('cal',this)">Date</button>
+  </div>
+  <label>Gestures: <select id="gsel" onchange="render()">
+    <option value="all">All active</option>
+    <option value="extension">Extension</option>
+    <option value="hook">Hook</option>
+    <option value="tabletop">Tabletop</option>
+    <option value="closed">Closed Fist</option>
+    <option value="flat">Flat Fist</option>
+  </select></label>
+</div>
+
+<div class="slabel">Events</div>
+<div class="ann-leg">
+  <span class="ann-li"><span class="ann-dot" style="background:#F09595;border:0.5px solid #E24B4A;"></span>Pain spike +3</span>
+  <span class="ann-li"><span class="ann-dot" style="background:#EF9F27;border:0.5px solid #BA7517;"></span>Gap 3+ days</span>
+</div>
+<div class="annot-outer" id="annotOuter"><div class="annot-inner" id="annotInner"></div></div>
+
+<div class="slabel">Gesture accuracy (%)</div>
+<div class="legend" id="leg"></div>
+<div class="scroll" id="s0"><div class="chart-wrap" id="w0" style="height:260px;"><canvas id="c0"></canvas></div></div>
+<div class="slabel">Pain (0–10)</div>
+<div class="scroll" id="s1"><div class="chart-wrap" id="w1" style="height:95px;"><canvas id="c1"></canvas></div></div>
+<div class="slabel">Minutes played</div>
+<div class="scroll" id="s2"><div class="chart-wrap" id="w2" style="height:95px;"><canvas id="c2"></canvas></div></div>
+
+<div class="fn">
+  <span class="mk"><span class="sw" style="background:#1D9E75;"></span>20+ min</span>
+  <span class="mk"><span class="sw" style="background:#378ADD;"></span>14–19 min</span>
+  <span class="mk"><span class="sw" style="background:#D4537E;"></span>&lt;14 min</span>
+  <span style="color:#bbb;">Day view: empty columns = rest days. All scroll in sync.</span>
+</div>
+
+<script>
+const START=new Date(2024,0,8);
+const TOTAL_DAYS=21*7;
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+function fmtWeek(d){const diff=Math.round((d-START)/86400000);return`W${Math.floor(diff/7)+6}·D${diff%7+1}`;}
+function fmtCal(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+
+const GCONF={
+  extension:{label:'Extension',color:'#378ADD',dash:[]},
+  hook:{label:'Hook',color:'#D4537E',dash:[6,3]},
+  tabletop:{label:'Tabletop',color:'#1D9E75',dash:[2,2]},
+  closed:{label:'Closed Fist',color:'#BA7517',dash:[8,2,2,2]},
+  flat:{label:'Flat Fist',color:'#7F77DD',dash:[4,2]},
+};
+const GFIELD={extension:'ext',hook:'hk',tabletop:'tb',closed:'cf',flat:'ff'};
+const GSTART={extension:6,hook:6,tabletop:8,closed:12,flat:22};
+const SESS_RAW=[
+  {wk:6,dy:1,pain:7,mins:8,ext:{h:6,a:20},hk:{h:5,a:20},tb:null,cf:null,ff:null},
+  {wk:6,dy:3,pain:6,mins:10,ext:{h:8,a:20},hk:{h:7,a:20},tb:null,cf:null,ff:null},
+  {wk:6,dy:5,pain:7,mins:9,ext:{h:9,a:20},hk:{h:8,a:20},tb:null,cf:null,ff:null},
+  {wk:7,dy:1,pain:6,mins:11,ext:{h:10,a:20},hk:{h:9,a:20},tb:null,cf:null,ff:null},
+  {wk:7,dy:4,pain:5,mins:12,ext:{h:11,a:20},hk:{h:10,a:20},tb:null,cf:null,ff:null},
+  {wk:8,dy:1,pain:6,mins:13,ext:{h:10,a:20},hk:{h:10,a:20},tb:{h:5,a:20},cf:null,ff:null},
+  {wk:8,dy:3,pain:5,mins:14,ext:{h:11,a:20},hk:{h:11,a:20},tb:{h:6,a:20},cf:null,ff:null},
+  {wk:8,dy:6,pain:6,mins:13,ext:{h:12,a:20},hk:{h:10,a:20},tb:{h:7,a:20},cf:null,ff:null},
+  {wk:9,dy:2,pain:8,mins:10,ext:{h:9,a:20},hk:{h:8,a:20},tb:{h:5,a:20},cf:null,ff:null},
+  {wk:10,dy:1,pain:6,mins:12,ext:{h:11,a:20},hk:{h:10,a:20},tb:{h:8,a:20},cf:null,ff:null},
+  {wk:11,dy:2,pain:4,mins:15,ext:{h:13,a:20},hk:{h:12,a:20},tb:{h:10,a:20},cf:null,ff:null},
+  {wk:12,dy:1,pain:4,mins:17,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:12,a:20},cf:{h:5,a:20},ff:null},
+  {wk:17,dy:1,pain:6,mins:11,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:12,a:20},cf:{h:8,a:20},ff:null},
+  {wk:22,dy:1,pain:2,mins:23,ext:{h:19,a:20},hk:{h:18,a:20},tb:{h:18,a:20},cf:{h:16,a:20},ff:{h:5,a:20}},
+  {wk:26,dy:5,pain:1,mins:27,ext:{h:20,a:20},hk:{h:20,a:20},tb:{h:20,a:20},cf:{h:20,a:20},ff:{h:17,a:20}},
+];
+function sessDate(s){return addDays(START,(s.wk-6)*7+(s.dy-1));}
+const SESS_MAP={};
+SESS_RAW.forEach((s,si)=>{SESS_MAP[sessDate(s).toISOString().slice(0,10)]={...s,si};});
+
+let gran='day',axisMode='week';
+let charts=[null,null,null];
+
+function setGran(g,btn){gran=g;document.querySelectorAll('#viewSeg button').forEach(b=>b.classList.remove('act'));btn.classList.add('act');render();}
+function setAxis(m,btn){axisMode=m;document.querySelectorAll('#axisSeg button').forEach(b=>b.classList.remove('act'));btn.classList.add('act');render();}
+
+function labelFor(d){return axisMode==='cal'?fmtCal(d):fmtWeek(d);}
+
+function allDates(){const a=[];for(let i=0;i<TOTAL_DAYS;i++)a.push(addDays(START,i));return a;}
+function weekGroups(){const g={};for(let w=6;w<=26;w++){g[`W${w}`]=[];for(let d=1;d<=7;d++){const off=(w-6)*7+(d-1);if(off<TOTAL_DAYS)g[`W${w}`].push(addDays(START,off));}}return g;}
+function monthGroups(){const g={};allDates().forEach(d=>{const k=d.toLocaleDateString('en-US',{month:'short',year:'numeric'});if(!g[k])g[k]=[];g[k].push(d);});return g;}
+
+function getSlots(){
+  if(gran==='day'){const dates=allDates();return{labels:dates.map(d=>labelFor(d)),dates,groups:null,keys:null};}
+  if(gran==='week'){const g=weekGroups();const k=Object.keys(g);const fd=k.map(kk=>g[kk][0]);return{labels:axisMode==='cal'?fd.map(d=>fmtCal(d)):k,dates:fd,groups:g,keys:k};}
+  const g=monthGroups();const k=Object.keys(g);const fd=k.map(kk=>g[kk][0]);return{labels:k,dates:fd,groups:g,keys:k};
+}
+function slotDates(slots,i){if(gran==='day')return[slots.dates[i]];return slots.groups[slots.keys[i]];}
+
+function prepCanvas(id,w,h){const c=document.getElementById(id);c.width=w;c.height=h;c.style.width=w+'px';c.style.height=h+'px';}
+
+function detectEvents(slots){
+  if(gran!=='day')return[];
+  const events=[];let prevPain=null,lastIdx=null;
+  slots.dates.forEach((d,i)=>{
+    const s=SESS_MAP[d.toISOString().slice(0,10)];
+    if(s){
+      if(prevPain!=null&&s.pain-prevPain>=3)events.push({startIdx:i,type:'pain',label:`Pain +${s.pain-prevPain} (${prevPain}→${s.pain})`});
+      if(lastIdx!=null&&i-lastIdx>3)events.push({startIdx:lastIdx+1,type:'gap',label:`${i-lastIdx-1}-day gap`});
+      prevPain=s.pain;lastIdx=i;
+    }
+  });
+  return events;
+}
+
+function buildAnnot(events,n,totalW){
+  const inner=document.getElementById('annotInner');
+  inner.style.width=totalW+'px';inner.innerHTML='';
+  events.forEach(ev=>{
+    const chip=document.createElement('div');chip.className='ann-chip '+ev.type;
+    chip.style.left=Math.round(ev.startIdx/n*totalW)+'px';chip.textContent=ev.label;
+    inner.appendChild(chip);
+  });
+}
+
+function render(){
+  const filter=document.getElementById('gsel').value;
+  const slots=getSlots();const n=slots.labels.length;
+  const pxPer=gran==='day'?18:gran==='week'?32:80;
+  const totalW=Math.max(660,n*pxPer);
+  const gKeys=Object.keys(GCONF).filter(k=>filter==='all'||filter===k);
+  const tickC='#999',gridC='rgba(0,0,0,0.06)',restC='rgba(0,0,0,0.03)';
+  ['w0','w1','w2'].forEach(id=>{document.getElementById(id).style.width=totalW+'px';});
+  charts.forEach(c=>{if(c)c.destroy();});
+  const shX={ticks:{color:tickC,font:{size:10},maxRotation:gran==='day'?50:0,autoSkip:true,maxTicksLimit:gran==='day'?28:21},grid:{color:gridC}};
+
+  const accDS=gKeys.map(k=>{
+    const gk=GFIELD[k];
+    return{label:GCONF[k].label,
+      data:slots.labels.map((l,i)=>{
+        const d=slotDates(slots,i);const wkN=Math.floor((d[0]-START)/86400000/7)+6;
+        if(wkN<GSTART[k])return null;
+        const vals=d.map(dd=>{const s=SESS_MAP[dd.toISOString().slice(0,10)];return s&&s[gk]?Math.round(s[gk].h/s[gk].a*100):null;}).filter(x=>x!=null);
+        return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):null;
+      }),
+      borderColor:GCONF[k].color,backgroundColor:GCONF[k].color+'18',
+      borderWidth:1.5,borderDash:GCONF[k].dash,pointRadius:gran==='day'?1.5:4,spanGaps:false,tension:0.35};
+  });
+  prepCanvas('c0',totalW,260);
+  charts[0]=new Chart(document.getElementById('c0'),{type:'line',data:{labels:slots.labels,datasets:accDS},
+    options:{responsive:false,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false}},
+      scales:{x:shX,y:{min:0,max:100,ticks:{color:tickC,font:{size:10},callback:v=>v+'%'},grid:{color:gridC}}}}});
+
+  const painVals=slots.labels.map((l,i)=>{const d=slotDates(slots,i);const v=d.map(dd=>{const s=SESS_MAP[dd.toISOString().slice(0,10)];return s?s.pain:null;}).filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;});
+  prepCanvas('c1',totalW,95);
+  charts[1]=new Chart(document.getElementById('c1'),{type:'bar',data:{labels:slots.labels,datasets:[{data:painVals,
+    backgroundColor:painVals.map(p=>p==null?restC:p>=7?'#E24B4A99':p>=5?'#EF9F2799':'#1D9E7599'),
+    borderColor:painVals.map(p=>p==null?'transparent':p>=7?'#E24B4A':p>=5?'#BA7517':'#0F6E56'),
+    borderWidth:1,borderRadius:2}]},
+    options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{...shX,grid:{display:false}},y:{min:0,max:10,ticks:{color:tickC,font:{size:10}},grid:{color:gridC}}}}});
+
+  const minsVals=slots.labels.map((l,i)=>slotDates(slots,i).reduce((acc,d)=>{const s=SESS_MAP[d.toISOString().slice(0,10)];return acc+(s?s.mins:0);},0));
+  const isSess=slots.labels.map((l,i)=>slotDates(slots,i).some(d=>!!SESS_MAP[d.toISOString().slice(0,10)]));
+  prepCanvas('c2',totalW,95);
+  charts[2]=new Chart(document.getElementById('c2'),{type:'bar',data:{labels:slots.labels,datasets:[{data:minsVals,
+    backgroundColor:minsVals.map((m,i)=>!isSess[i]&&gran==='day'?restC:m>=20?'#1D9E7599':m>=14?'#378ADD66':'#D4537E66'),
+    borderColor:minsVals.map((m,i)=>!isSess[i]&&gran==='day'?'transparent':m>=20?'#1D9E75':m>=14?'#378ADD':'#D4537E'),
+    borderWidth:1,borderRadius:2}]},
+    options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{...shX,grid:{display:false}},y:{min:0,ticks:{color:tickC,font:{size:10}},grid:{color:gridC}}}}});
+
+  buildAnnot(detectEvents(slots),n,totalW);
+  document.getElementById('annotInner').style.minWidth=totalW+'px';
+
+  document.getElementById('leg').innerHTML=gKeys.map(k=>{
+    const c=GCONF[k];const bi=c.dash.length?`repeating-linear-gradient(90deg,${c.color} 0,${c.color} 6px,transparent 6px,transparent 9px)`:'';
+    return`<span class="li"><span class="ld" style="background:${c.dash.length?'transparent':c.color};${bi?'background-image:'+bi:''}"></span>${c.label}</span>`;
+  }).join('');
+
+  const scrollers=['annotOuter','s0','s1','s2'].map(id=>document.getElementById(id));
+  scrollers.forEach(o=>{o.onscroll=()=>scrollers.forEach(x=>{if(x!==o)x.scrollLeft=o.scrollLeft;});});
+}
+
+render();
+</script>
+</body>
+</html>

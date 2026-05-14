@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignWave — Tyler M. Patient Dashboard</title>
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root {
+  --bg:       #f5f4f1;
+  --surface:  #ffffff;
+  --border:   rgba(0,0,0,0.08);
+  --text-pri: #1a1916;
+  --text-sec: #6b6860;
+  --text-ter: #a09e99;
+  --font:     'DM Sans', system-ui, sans-serif;
+  --col-odd:  rgba(0,0,0,0.000);
+  --col-even: rgba(0,0,0,0.032);
+  --sun-line: rgba(0,0,0,0.14);
+  --day-line: rgba(0,0,0,0.055);
+  --h-line:   rgba(0,0,0,0.07);
+  --label-w:  120px; /* left label panel */
+  --yaxis-w:  40px;  /* Y axis on each side */
+  --day-w:    44px;  /* px per day column — overridden by JS in Month view */
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text-pri);
+  min-height: 100vh;
+  padding-bottom: 60px;
+}
+
+/* ============================================================
+   PAGE HEADER
+   ============================================================ */
+.page-header {
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  padding: 18px 24px 14px;
+  display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap;
+}
+.patient-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: #E6F1FB; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 600; color: #185FA5; flex-shrink: 0;
+}
+.patient-info h1 { font-size: 16px; font-weight: 600; }
+.patient-info p  { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+.header-meta { display: flex; gap: 18px; margin-left: auto; flex-wrap: wrap; align-items: center; }
+.meta-item .mlabel { font-size: 10px; color: var(--text-ter); text-transform: uppercase; letter-spacing:.04em; }
+.meta-item .mvalue { font-size: 13px; font-weight: 500; margin-top: 1px; }
+
+/* ============================================================
+   TOOLBAR
+   ============================================================ */
+.toolbar {
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  padding: 9px 24px;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  position: sticky; top: 0; z-index: 200;
+}
+.seg {
+  display: flex; border: 0.5px solid rgba(0,0,0,0.18);
+  border-radius: 6px; overflow: hidden;
+}
+.seg button {
+  background: transparent; border: none;
+  border-right: 0.5px solid rgba(0,0,0,0.18);
+  padding: 5px 12px; font-size: 12px; font-family: var(--font);
+  color: var(--text-sec); cursor: pointer;
+}
+.seg button:last-child { border-right: none; }
+.seg button.act { background: var(--text-pri); color: #fff; }
+select {
+  font-family: var(--font); font-size: 12px; padding: 5px 24px 5px 9px;
+  border: 0.5px solid rgba(0,0,0,0.18); border-radius: 6px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b6860' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center;
+  color: var(--text-pri); appearance: none; cursor: pointer;
+}
+.tlabel { font-size: 12px; color: var(--text-sec); }
+.spacer { flex: 1; }
+.lane-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 20px; font-size: 11px;
+  border: 0.5px solid rgba(0,0,0,0.18); background: #fff;
+  color: var(--text-sec); cursor: pointer; user-select: none;
+}
+.lane-pill.on { background: var(--text-pri); color: #fff; border-color: var(--text-pri); }
+.lane-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity:.7; }
+
+/* ============================================================
+   DASHBOARD BODY
+   ============================================================ */
+.dashboard {
+  padding: 16px 24px 0;
+}
+
+/* ============================================================
+   CHART PANEL
+   Each panel = left label column + scrollable chart area
+   ============================================================ */
+.panel {
+  display: flex;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.panel.hidden { display: none; }
+
+/* Left label area — never scrolls */
+.panel-label {
+  flex-shrink: 0;
+  width: var(--label-w);
+  padding: 12px 12px 12px 14px;
+  border-right: 0.5px solid var(--border);
+  display: flex; flex-direction: column; justify-content: flex-start;
+  background: var(--surface);
+  position: relative; z-index: 2;
+}
+.panel-label h2 { font-size: 15px; font-weight: 700; line-height: 1.15; color: var(--text-pri); }
+.panel-label .sub { font-size: 11px; color: var(--text-ter); margin-top: 2px; }
+.legend { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.leg-row { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-sec); }
+.leg-swatch {
+  width: 12px; height: 12px; border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.leg-swatch svg { width: 8px; height: 8px; }
+
+/* Scrollable chart area */
+.panel-scroll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+.panel-scroll::-webkit-scrollbar { height: 3px; }
+.panel-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
+
+/* Canvas fills the scroll area naturally */
+.panel-scroll canvas { display: block; }
+
+/* Header panel (week + day labels, no label column needed — uses same layout) */
+.header-panel {
+  display: flex;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.header-spacer {
+  flex-shrink: 0;
+  width: var(--label-w);
+  border-right: 0.5px solid var(--border);
+  background: var(--surface);
+}
+.header-scroll {
+  flex: 1; overflow-x: hidden; /* header scroll is driven by JS sync */
+}
+.header-scroll canvas { display: block; }
+
+/* Annotation lane */
+.annot-panel {
+  display: flex;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.annot-label {
+  flex-shrink: 0; width: var(--label-w);
+  border-right: 0.5px solid var(--border);
+  padding: 6px 12px;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.ann-key { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-sec); }
+.ann-dot { width: 8px; height: 8px; border-radius: 2px; }
+.annot-scroll { flex: 1; overflow-x: hidden; position: relative; height: 30px; }
+.annot-inner { position: relative; height: 30px; }
+.ann-chip {
+  position: absolute; top: 4px; height: 22px;
+  border-radius: 5px; display: flex; align-items: center;
+  padding: 0 7px; font-size: 10px; font-weight: 600;
+  white-space: nowrap; border: 0.5px solid;
+}
+.ann-chip.pain { background:#FCEBEB; color:#791F1F; border-color:#F09595; }
+.ann-chip.gap  { background:#FAEEDA; color:#633806; border-color:#EF9F27; }
+
+/* Footer (mirrors header) */
+.footer-panel {
+  display: flex;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.footer-spacer {
+  flex-shrink: 0; width: var(--label-w);
+  border-right: 0.5px solid var(--border);
+  background: var(--surface);
+}
+.footer-scroll { flex: 1; overflow-x: hidden; }
+.footer-scroll canvas { display: block; }
+</style>
+</head>
+<body>
+
+<!-- PAGE HEADER -->
+<header class="page-header">
+  <div class="patient-avatar">TM</div>
+  <div class="patient-info">
+    <h1>Tyler M.</h1>
+    <p>27 · Soldier · Distal radius fracture — closed reduction &amp; casting</p>
+  </div>
+  <div class="header-meta">
+    <div class="meta-item"><div class="mlabel">Cast removed</div><div class="mvalue">Jan 8, 2024</div></div>
+    <div class="meta-item"><div class="mlabel">Sessions</div><div class="mvalue">42</div></div>
+    <div class="meta-item"><div class="mlabel">Week</div><div class="mvalue">W26</div></div>
+    <div class="meta-item"><div class="mlabel">Status</div><div class="mvalue" style="color:#1D9E75">Return to duty ✓</div></div>
+  </div>
+</header>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="seg" id="viewSeg">
+    <button onclick="setView('month',this)">Month</button>
+    <button onclick="setView('quarter',this)">3 Months</button>
+    <button class="act" onclick="setView('all',this)">All</button>
+  </div>
+  <span class="tlabel">Gestures</span>
+  <select id="gsel" onchange="draw()">
+    <option value="all">All active</option>
+    <option value="extension">Extension</option>
+    <option value="hook">Hook</option>
+    <option value="tabletop">Tabletop</option>
+    <option value="closed">Closed Fist</option>
+    <option value="flat">Flat Fist</option>
+  </select>
+  <div class="spacer"></div>
+  <span class="tlabel">Lanes</span>
+  <span class="lane-pill on" data-panel="panelAcc"  onclick="togglePanel(this)"><span class="dot"></span>Accuracy</span>
+  <span class="lane-pill on" data-panel="panelPain" onclick="togglePanel(this)"><span class="dot"></span>Pain</span>
+  <span class="lane-pill on" data-panel="panelMins" onclick="togglePanel(this)"><span class="dot"></span>Minutes</span>
+  <span class="lane-pill on" data-panel="panelAnnot" onclick="togglePanel(this)"><span class="dot"></span>Events</span>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard">
+
+  <!-- TOP HEADER: week spans + day labels -->
+  <div class="header-panel" id="topHeader">
+    <div class="header-spacer"></div>
+    <div class="header-scroll" id="topHeaderScroll">
+      <canvas id="cHeader"></canvas>
+    </div>
+  </div>
+
+  <!-- ANNOTATIONS -->
+  <div class="annot-panel" id="panelAnnot">
+    <div class="annot-label">
+      <span class="ann-key"><span class="ann-dot" style="background:#F09595;border:0.5px solid #E24B4A;"></span>Pain spike</span>
+      <span class="ann-key"><span class="ann-dot" style="background:#EF9F27;border:0.5px solid #BA7517;"></span>Gap 3+ days</span>
+    </div>
+    <div class="annot-scroll" id="annotScroll">
+      <div class="annot-inner" id="annotInner"></div>
+    </div>
+  </div>
+
+  <!-- ACCURACY -->
+  <div class="panel" id="panelAcc">
+    <div class="panel-label">
+      <h2>Accuracy</h2>
+      <div class="sub">% Hit Rate</div>
+      <div class="legend" id="legAcc"></div>
+    </div>
+    <div class="panel-scroll" id="scrollAcc">
+      <canvas id="cAcc"></canvas>
+    </div>
+  </div>
+
+  <!-- PAIN -->
+  <div class="panel" id="panelPain">
+    <div class="panel-label">
+      <h2>Pain</h2>
+      <div class="sub">0–10 PROMS</div>
+    </div>
+    <div class="panel-scroll" id="scrollPain">
+      <canvas id="cPain"></canvas>
+    </div>
+  </div>
+
+  <!-- MINUTES -->
+  <div class="panel" id="panelMins">
+    <div class="panel-label">
+      <h2>Active<br>Time</h2>
+      <div class="sub">active minutes</div>
+    </div>
+    <div class="panel-scroll" id="scrollMins">
+      <canvas id="cMins"></canvas>
+    </div>
+  </div>
+
+  <!-- FOOTER: mirror of header -->
+  <div class="footer-panel" id="footerPanel">
+    <div class="footer-spacer"></div>
+    <div class="footer-scroll" id="footerScroll">
+      <canvas id="cFooter"></canvas>
+    </div>
+  </div>
+
+</div><!-- /.dashboard -->
+
+<script>
+/* ============================================================
+   DATA
+   ============================================================ */
+const START = new Date(2024, 0, 8); // Jan 8 2024 = cast removal (Week 6)
+const TOTAL_DAYS = 21 * 7;          // 147 days = weeks 6–26
+
+const GCONF = {
+  extension: { label:'Extension',   color:'#378ADD' },
+  hook:      { label:'Hook',        color:'#D4537E' },
+  tabletop:  { label:'Tabletop',    color:'#1D9E75' },
+  closed:    { label:'Closed Fist', color:'#BA7517' },
+  flat:      { label:'Flat Fist',   color:'#7F77DD' },
+};
+const GFIELD = { extension:'ext', hook:'hk', tabletop:'tb', closed:'cf', flat:'ff' };
+const GSTART = { extension:6, hook:6, tabletop:8, closed:12, flat:22 };
+
+const SESS_RAW = [
+  {wk:6,dy:1,pain:7,mins:8,  ext:{h:6,a:20}, hk:{h:5,a:20}, tb:null,        cf:null,        ff:null,  note:'First session — calibration day.'},
+  {wk:6,dy:3,pain:6,mins:10, ext:{h:8,a:20}, hk:{h:7,a:20}, tb:null,        cf:null,        ff:null,  note:''},
+  {wk:6,dy:5,pain:7,mins:9,  ext:{h:9,a:20}, hk:{h:8,a:20}, tb:null,        cf:null,        ff:null,  note:''},
+  {wk:7,dy:1,pain:6,mins:11, ext:{h:10,a:20},hk:{h:9,a:20}, tb:null,        cf:null,        ff:null,  note:''},
+  {wk:7,dy:4,pain:5,mins:12, ext:{h:11,a:20},hk:{h:10,a:20},tb:null,        cf:null,        ff:null,  note:''},
+  {wk:8,dy:1,pain:6,mins:13, ext:{h:10,a:20},hk:{h:10,a:20},tb:{h:5,a:20}, cf:null,        ff:null,  note:'Tabletop introduced'},
+  {wk:8,dy:3,pain:5,mins:14, ext:{h:11,a:20},hk:{h:11,a:20},tb:{h:6,a:20}, cf:null,        ff:null,  note:''},
+  {wk:8,dy:6,pain:6,mins:13, ext:{h:12,a:20},hk:{h:10,a:20},tb:{h:7,a:20}, cf:null,        ff:null,  note:''},
+  {wk:9,dy:2,pain:8,mins:10, ext:{h:9,a:20}, hk:{h:8,a:20}, tb:{h:5,a:20}, cf:null,        ff:null,  note:'Pain spike — overuse reported'},
+  {wk:10,dy:1,pain:6,mins:12,ext:{h:11,a:20},hk:{h:10,a:20},tb:{h:8,a:20}, cf:null,        ff:null,  note:'9-day gap (rest period)'},
+  {wk:10,dy:4,pain:5,mins:14,ext:{h:12,a:20},hk:{h:11,a:20},tb:{h:9,a:20}, cf:null,        ff:null,  note:''},
+  {wk:11,dy:2,pain:4,mins:15,ext:{h:13,a:20},hk:{h:12,a:20},tb:{h:10,a:20},cf:null,        ff:null,  note:''},
+  {wk:11,dy:5,pain:4,mins:16,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:11,a:20},cf:null,        ff:null,  note:''},
+  {wk:12,dy:1,pain:4,mins:17,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:12,a:20},cf:{h:5,a:20}, ff:null,  note:'Closed Fist introduced'},
+  {wk:12,dy:4,pain:4,mins:18,ext:{h:15,a:20},hk:{h:14,a:20},tb:{h:12,a:20},cf:{h:6,a:20}, ff:null,  note:''},
+  {wk:13,dy:1,pain:3,mins:18,ext:{h:15,a:20},hk:{h:14,a:20},tb:{h:13,a:20},cf:{h:7,a:20}, ff:null,  note:''},
+  {wk:13,dy:3,pain:3,mins:19,ext:{h:16,a:20},hk:{h:15,a:20},tb:{h:13,a:20},cf:{h:8,a:20}, ff:null,  note:''},
+  {wk:13,dy:6,pain:4,mins:17,ext:{h:15,a:20},hk:{h:14,a:20},tb:{h:13,a:20},cf:{h:7,a:20}, ff:null,  note:''},
+  {wk:14,dy:2,pain:3,mins:19,ext:{h:16,a:20},hk:{h:15,a:20},tb:{h:14,a:20},cf:{h:9,a:20}, ff:null,  note:''},
+  {wk:14,dy:5,pain:3,mins:20,ext:{h:17,a:20},hk:{h:16,a:20},tb:{h:15,a:20},cf:{h:10,a:20},ff:null,  note:''},
+  {wk:15,dy:2,pain:3,mins:20,ext:{h:17,a:20},hk:{h:16,a:20},tb:{h:15,a:20},cf:{h:11,a:20},ff:null,  note:''},
+  {wk:15,dy:5,pain:2,mins:21,ext:{h:18,a:20},hk:{h:17,a:20},tb:{h:16,a:20},cf:{h:12,a:20},ff:null,  note:''},
+  {wk:16,dy:2,pain:3,mins:20,ext:{h:17,a:20},hk:{h:17,a:20},tb:{h:15,a:20},cf:{h:11,a:20},ff:null,  note:''},
+  {wk:17,dy:1,pain:6,mins:11,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:12,a:20},cf:{h:8,a:20}, ff:null,  note:'Pain spike — duty-related strain'},
+  {wk:18,dy:2,pain:4,mins:15,ext:{h:15,a:20},hk:{h:14,a:20},tb:{h:13,a:20},cf:{h:10,a:20},ff:null,  note:'10-day gap'},
+  {wk:18,dy:5,pain:3,mins:17,ext:{h:16,a:20},hk:{h:15,a:20},tb:{h:14,a:20},cf:{h:11,a:20},ff:null,  note:''},
+  {wk:19,dy:1,pain:3,mins:19,ext:{h:17,a:20},hk:{h:16,a:20},tb:{h:15,a:20},cf:{h:12,a:20},ff:null,  note:''},
+  {wk:19,dy:3,pain:2,mins:20,ext:{h:18,a:20},hk:{h:17,a:20},tb:{h:16,a:20},cf:{h:13,a:20},ff:null,  note:''},
+  {wk:19,dy:6,pain:2,mins:21,ext:{h:18,a:20},hk:{h:17,a:20},tb:{h:16,a:20},cf:{h:14,a:20},ff:null,  note:''},
+  {wk:20,dy:2,pain:2,mins:22,ext:{h:19,a:20},hk:{h:18,a:20},tb:{h:17,a:20},cf:{h:15,a:20},ff:null,  note:''},
+  {wk:20,dy:5,pain:2,mins:22,ext:{h:19,a:20},hk:{h:18,a:20},tb:{h:17,a:20},cf:{h:15,a:20},ff:null,  note:''},
+  {wk:21,dy:2,pain:2,mins:22,ext:{h:19,a:20},hk:{h:18,a:20},tb:{h:17,a:20},cf:{h:16,a:20},ff:null,  note:''},
+  {wk:22,dy:1,pain:2,mins:23,ext:{h:19,a:20},hk:{h:18,a:20},tb:{h:18,a:20},cf:{h:16,a:20},ff:{h:5,a:20}, note:'Flat Fist introduced'},
+  {wk:22,dy:4,pain:2,mins:23,ext:{h:19,a:20},hk:{h:19,a:20},tb:{h:18,a:20},cf:{h:16,a:20},ff:{h:6,a:20}, note:''},
+  {wk:23,dy:1,pain:2,mins:24,ext:{h:20,a:20},hk:{h:19,a:20},tb:{h:18,a:20},cf:{h:17,a:20},ff:{h:8,a:20}, note:''},
+  {wk:23,dy:4,pain:1,mins:24,ext:{h:20,a:20},hk:{h:19,a:20},tb:{h:19,a:20},cf:{h:17,a:20},ff:{h:9,a:20}, note:''},
+  {wk:24,dy:1,pain:1,mins:25,ext:{h:20,a:20},hk:{h:19,a:20},tb:{h:19,a:20},cf:{h:18,a:20},ff:{h:11,a:20},note:''},
+  {wk:24,dy:4,pain:1,mins:25,ext:{h:20,a:20},hk:{h:20,a:20},tb:{h:19,a:20},cf:{h:18,a:20},ff:{h:12,a:20},note:''},
+  {wk:25,dy:2,pain:1,mins:25,ext:{h:20,a:20},hk:{h:20,a:20},tb:{h:20,a:20},cf:{h:19,a:20},ff:{h:14,a:20},note:''},
+  {wk:25,dy:5,pain:1,mins:26,ext:{h:20,a:20},hk:{h:20,a:20},tb:{h:20,a:20},cf:{h:19,a:20},ff:{h:15,a:20},note:''},
+  {wk:26,dy:2,pain:1,mins:26,ext:{h:20,a:20},hk:{h:20,a:20},tb:{h:20,a:20},cf:{h:20,a:20},ff:{h:16,a:20},note:''},
+  {wk:26,dy:5,pain:1,mins:27,ext:{h:20,a:20},hk:{h:20,a:20},tb:{h:20,a:20},cf:{h:20,a:20},ff:{h:17,a:20},note:'Final assessment — cleared for return to duty.'},
+];
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+
+// Build per-day lookup: index 0 = Jan 8 = day 0
+const DAY_DATA = [];
+const SESS_BY_KEY = {};
+SESS_RAW.forEach((s,si)=>{
+  const d = addDays(START,(s.wk-6)*7+(s.dy-1));
+  const k = d.toISOString().slice(0,10);
+  SESS_BY_KEY[k] = {...s, si, date:d};
+});
+for(let i=0;i<TOTAL_DAYS;i++){
+  const d = addDays(START,i);
+  const k = d.toISOString().slice(0,10);
+  DAY_DATA.push({ idx:i, date:d, key:k, sess: SESS_BY_KEY[k]||null });
+}
+
+const DOW = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function fmtWeekLabel(d){
+  // "Jan 8" style for first day of each calendar week block
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+
+/* ============================================================
+   VIEW STATE
+   ============================================================ */
+let viewMode = 'all';
+
+function setView(m,btn){
+  viewMode=m;
+  document.querySelectorAll('#viewSeg button').forEach(b=>b.classList.remove('act'));
+  btn.classList.add('act');
+  draw();
+}
+
+function togglePanel(pill){
+  const panel=document.getElementById(pill.dataset.panel);
+  pill.classList.toggle('on');
+  panel.classList.toggle('hidden',!pill.classList.contains('on'));
+  syncScroll();
+}
+
+/* ============================================================
+   GEOMETRY
+   ============================================================ */
+const YAXIS_W = 40;   // Y axis on each side of chart area
+const PAD_TOP = 6;
+const PAD_BOT = 24;   // room for x labels at bottom of data charts
+const DPR = window.devicePixelRatio||1;
+
+function getScrollW(){
+  return document.getElementById('scrollAcc').clientWidth || 700;
+}
+
+function getDayW(){
+  const sw = getScrollW() - YAXIS_W*2;
+  if(viewMode==='all'){
+    // All: fit every day into viewport, no scroll
+    return Math.max(8, sw/TOTAL_DAYS);
+  }
+  if(viewMode==='quarter'){
+    // 3 months: 84 days fills viewport, scroll left for history
+    return Math.max(10, sw/84);
+  }
+  // month: 28 days fills viewport, scroll left for history
+  return Math.max(20, sw/28);
+}
+
+function getTotalW(dayW){
+  return Math.round(dayW * TOTAL_DAYS) + YAXIS_W*2;
+}
+
+// Center x of day column i
+function colX(i, dayW){ return YAXIS_W + (i+0.5)*dayW; }
+
+// Scroll to right edge (most recent) for month view
+function snapToRecent(dayW){
+  if(viewMode==='all') return; // 'all' fits without scroll
+  const scrollers = ['scrollAcc','scrollPain','scrollMins','topHeaderScroll','footerScroll','annotScroll'];
+  scrollers.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.scrollLeft = el.scrollWidth;
+  });
+}
+
+/* ============================================================
+   CANVAS HELPERS
+   ============================================================ */
+function sizeCanvas(canvas, w, h){
+  canvas.width  = Math.round(w * DPR);
+  canvas.height = Math.round(h * DPR);
+  canvas.style.width  = w+'px';
+  canvas.style.height = h+'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+  return ctx;
+}
+
+function resetCanvas(canvas, w, h){
+  canvas.width  = Math.round(w * DPR);
+  canvas.height = Math.round(h * DPR);
+  canvas.style.width  = w+'px';
+  canvas.style.height = h+'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.scale(DPR, DPR);
+  return ctx;
+}
+
+/* ============================================================
+   SHARED COLUMN BACKGROUND + GRID LINES
+   Draws alternating bands and vertical day lines.
+   Sundays get a solid week-boundary line.
+   ============================================================ */
+function sunWeekIndex(date){
+  // Returns a 0-based calendar week number anchored to Sundays.
+  // We use a reference Sunday before or on Jan 1 2024.
+  const refSun = new Date(2023,11,31); // Dec 31 2023 = Sunday
+  return Math.floor((date - refSun) / (7*86400000));
+}
+
+function drawColumnBg(ctx, dayW, totalW, h, days){
+  // Alternating bands:
+  //   All view  → alternate by calendar Sun–Sat week block
+  //   Month view → alternate by individual day (odd/even position)
+  for(let i=0;i<days.length;i++){
+    const d = days[i];
+    const x = YAXIS_W + i*dayW;
+    let band;
+    if(viewMode==='all'){
+      // All: week-level alternation — +1 so Sunday starts the grey band
+      band = (sunWeekIndex(d.date) + 1) % 2;
+    } else {
+      // Month / 3-Month: day-level alternation anchored to day-of-week
+      band = d.date.getDay() % 2;
+    }
+    ctx.fillStyle = band===0 ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,0.030)';
+    ctx.fillRect(x, 0, dayW, h);
+  }
+  // vertical lines — Sunday gets the dark boundary line
+  for(let i=0;i<=days.length;i++){
+    const x = YAXIS_W + i*dayW;
+    const isSun = i<days.length && days[i].date.getDay()===0;
+    const isFirst = i===0;
+    ctx.beginPath();
+    ctx.moveTo(x, 0); ctx.lineTo(x, h);
+    ctx.strokeStyle = (isFirst||isSun) ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.05)';
+    ctx.lineWidth   = (isFirst||isSun) ? 1 : 0.5;
+    ctx.stroke();
+  }
+  // right boundary
+  ctx.beginPath();
+  ctx.moveTo(YAXIS_W+days.length*dayW,0);
+  ctx.lineTo(YAXIS_W+days.length*dayW,h);
+  ctx.strokeStyle='rgba(0,0,0,0.16)';ctx.lineWidth=1;ctx.stroke();
+}
+
+/* ============================================================
+   Y AXIS DRAWING (both sides)
+   ============================================================ */
+function drawYAxes(ctx, yMin, yMax, totalW, plotH, tickCb, color){
+  const ticks = niceTicks(yMin, yMax, 5);
+  ctx.font = `${9*DPR/DPR}px DM Sans, system-ui`;
+  ctx.fillStyle = '#9e9c97';
+  ctx.textBaseline = 'middle';
+
+  ticks.forEach(v=>{
+    const y = PAD_TOP + plotH * (1-(v-yMin)/(yMax-yMin));
+    const label = tickCb ? tickCb(v) : String(v);
+
+    // horizontal guide line across data area
+    ctx.beginPath();
+    ctx.moveTo(YAXIS_W, y); ctx.lineTo(totalW-YAXIS_W, y);
+    ctx.strokeStyle = 'rgba(0,0,0,0.065)';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([3,4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // left label
+    ctx.textAlign = 'right';
+    ctx.fillText(label, YAXIS_W-4, y);
+    // right label
+    ctx.textAlign = 'left';
+    ctx.fillText(label, totalW-YAXIS_W+4, y);
+  });
+}
+
+function niceTicks(min,max,count){
+  const range=max-min, step=Math.pow(10,Math.floor(Math.log10(range/count)));
+  const candidates=[1,2,5,10].map(x=>x*step);
+  const step2=candidates.find(s=>range/s<=count+1)||candidates[candidates.length-1];
+  const ticks=[];
+  let v=Math.ceil(min/step2)*step2;
+  while(v<=max+1e-9){ticks.push(Math.round(v*1000)/1000);v+=step2;}
+  return ticks;
+}
+
+function valToY(v,yMin,yMax,plotH){ return PAD_TOP + plotH*(1-(v-yMin)/(yMax-yMin)); }
+
+/* ============================================================
+   HEADER / FOOTER CANVAS
+   Draws week spans (top row) + day-of-week labels (bottom row)
+   ============================================================ */
+function drawHeader(ctx, dayW, totalW, days, isFooter){
+  const H = 44;
+  ctx.clearRect(0,0,totalW,H);
+
+  const weekRowH = 18, dowRowH = 26;
+
+  // Week spans — one label per Sun-Sat block.
+  // The separator line MUST be at the left edge of the Sunday column (getDay()===0),
+  // not at startI (which may be mid-week for the first partial group).
+  // Label text = "Mon DD" of that Sunday, placed just right of the line.
+  let wi = 0;
+  while(wi < days.length){
+    const startI = wi;
+    const weekSun = sunWeekIndex(days[startI].date);
+    while(wi<days.length && sunWeekIndex(days[wi].date)===weekSun) wi++;
+
+    // Find the Sunday column index within this group (may not exist if first partial week)
+    let sunColI = -1;
+    for(let j=startI;j<wi;j++){
+      if(days[j].date.getDay()===0){ sunColI=j; break; }
+    }
+
+    // Label date = the Sunday of this week (may be before data range)
+    const labelDate = sunColI>=0
+      ? days[sunColI].date
+      : addDays(days[startI].date, -days[startI].date.getDay());
+    const label = fmtWeekLabel(labelDate);
+
+    // Line position: at the Sunday column left edge if it exists, else at startI
+    const lineX = sunColI>=0
+      ? YAXIS_W + sunColI*dayW
+      : YAXIS_W + startI*dayW;
+
+    // Draw separator line
+    ctx.beginPath(); ctx.moveTo(lineX,2); ctx.lineTo(lineX,weekRowH-3);
+    ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=1; ctx.stroke();
+
+    // Draw label just right of the line
+    ctx.font = `500 ${11}px DM Sans, system-ui`;
+    ctx.fillStyle = '#6b6860';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, lineX+4, weekRowH/2);
+  }
+
+  // day-of-week labels
+  days.forEach((d,i)=>{
+    const x = YAXIS_W + (i+0.5)*dayW;
+    const dow = DOW[d.date.getDay()];
+    const isSun = d.date.getDay()===0;
+    ctx.font = `${isSun?'600':'400'} ${10}px DM Sans, system-ui`;
+    ctx.fillStyle = isSun ? '#1a1916' : '#9e9c97';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // only draw if column wide enough
+    if(dayW >= 14) ctx.fillText(dow, x, weekRowH + dowRowH/2);
+  });
+}
+
+/* ============================================================
+   ACCURACY CHART
+   ============================================================ */
+function drawAccuracy(ctx, dayW, totalW, days, gKeys, plotH){
+  const h = PAD_TOP + plotH + PAD_BOT;
+  drawColumnBg(ctx, dayW, totalW, h, days);
+
+  // Compute Y range from actual data with padding
+  const accVals = [];
+  days.forEach(d=>{
+    gKeys.forEach(k=>{
+      const gk=GFIELD[k];
+      if(!d.sess||!d.sess[gk])return;
+      accVals.push(Math.round(d.sess[gk].h/d.sess[gk].a*100));
+    });
+  });
+  const accDataMin = accVals.length?Math.min(...accVals):0;
+  const accDataMax = accVals.length?Math.max(...accVals):100;
+  const yPad = Math.max(5, (accDataMax-accDataMin)*0.12);
+  const yMin = Math.max(0, Math.floor((accDataMin-yPad)/5)*5);
+  const yMax = Math.min(100, Math.ceil((accDataMax+yPad)/5)*5);
+  drawYAxes(ctx, yMin, yMax, totalW, plotH, v=>v+'%');
+
+  // per-gesture lines then dots
+  gKeys.forEach(k=>{
+    const gk = GFIELD[k];
+    const color = GCONF[k].color;
+    const pts = [];
+    days.forEach((d,i)=>{
+      const wkNum = Math.floor((d.date-START)/86400000/7)+6;
+      if(wkNum<GSTART[k]||!d.sess||!d.sess[gk]) return;
+      const pct = Math.round(d.sess[gk].h/d.sess[gk].a*100);
+      pts.push({x: colX(i,dayW), y: valToY(pct,yMin,yMax,plotH)});
+    });
+
+    if(pts.length<2) return;
+
+    // line
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.lineJoin='round';
+    ctx.setLineDash([]); ctx.stroke();
+
+    // dots
+    pts.forEach(p=>{
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(3.5, dayW*0.18), 0, Math.PI*2);
+      ctx.fillStyle=color; ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    });
+  });
+}
+
+/* ============================================================
+   PAIN CHART
+   Straight line (no curves), filled circles with value inside
+   ============================================================ */
+function drawPain(ctx, dayW, totalW, days, plotH){
+  const h = PAD_TOP + plotH + PAD_BOT;
+  drawColumnBg(ctx, dayW, totalW, h, days);
+
+  // Data-driven Y for pain — avoid wasted space below the data
+  const painVals = days.filter(d=>d.sess).map(d=>d.sess.pain);
+  const pMin = painVals.length?Math.min(...painVals):0;
+  const pMax = painVals.length?Math.max(...painVals):10;
+  const pPad = Math.max(1, (pMax-pMin)*0.2);
+  const yMin = Math.max(0, Math.floor(pMin-pPad));
+  const yMax = Math.min(10, Math.ceil(pMax+pPad));
+  drawYAxes(ctx, yMin, yMax, totalW, plotH, v=>v);
+
+  const color = '#A0785A'; // warm brown like mockup
+  const pts = [];
+  days.forEach((d,i)=>{
+    if(!d.sess) return;
+    pts.push({x: colX(i,dayW), y: valToY(d.sess.pain,yMin,yMax,plotH), v: d.sess.pain});
+  });
+
+  if(pts.length<2) return;
+
+  // straight line
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+  ctx.strokeStyle=color+'99'; ctx.lineWidth=1.5; ctx.lineJoin='round';
+  ctx.setLineDash([]); ctx.stroke();
+
+  const r = Math.max(10, Math.min(14, dayW*0.4));
+  pts.forEach(p=>{
+    // circle fill
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+    ctx.fillStyle='#7B4A2D'; ctx.fill();
+    // value
+    ctx.font=`600 ${Math.max(8,r*0.85)}px DM Sans,system-ui`;
+    ctx.fillStyle='#fff';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    if(dayW>=14) ctx.fillText(String(p.v), p.x, p.y);
+  });
+}
+
+/* ============================================================
+   MINUTES CHART
+   Bars filling column width (with 2px gap each side),
+   minute value printed inside in white
+   ============================================================ */
+function drawMins(ctx, dayW, totalW, days, plotH){
+  const h = PAD_TOP + plotH + PAD_BOT;
+  drawColumnBg(ctx, dayW, totalW, h, days);
+
+  const maxMins = Math.max(...days.map(d=>d.sess?d.sess.mins:0), 5);
+  const yMin=0;
+  // Snap yMax to a tidy number just above actual max — no extra headroom
+  const yMax = Math.ceil(maxMins/5)*5;
+  drawYAxes(ctx, yMin, yMax, totalW, plotH, v=>v+'m');
+
+  const gap = Math.max(1.5, dayW*0.06);
+  days.forEach((d,i)=>{
+    if(!d.sess) return;
+    const m = d.sess.mins;
+    const x = YAXIS_W + i*dayW + gap;
+    const bw = dayW - gap*2;
+    const barH = plotH * m/yMax;
+    const y = PAD_TOP + plotH - barH;
+
+    // bar color: >20 green, 14–19 blue, <14 pink
+    const col = m>=20?'#1D9E75':m>=14?'#2B8FD0':'#D4537E';
+    ctx.fillStyle=col;
+    ctx.beginPath();
+    const rad = Math.min(3, bw/3);
+    ctx.roundRect(x, y, bw, barH, [rad,rad,0,0]);
+    ctx.fill();
+
+    // label inside bar
+    if(barH>16 && dayW>=18){
+      ctx.font=`600 ${Math.min(11,bw*0.45)}px DM Sans,system-ui`;
+      ctx.fillStyle='#fff';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(m+'m', x+bw/2, y+Math.min(barH/2,18));
+    }
+  });
+}
+
+/* ============================================================
+   ANNOTATIONS
+   ============================================================ */
+function buildAnnot(days, dayW, totalW){
+  const inner = document.getElementById('annotInner');
+  inner.style.width = totalW+'px';
+  inner.innerHTML='';
+
+  let prevPain=null, lastSessI=null;
+  days.forEach((d,i)=>{
+    if(!d.sess) return;
+    if(prevPain!=null && d.sess.pain-prevPain>=3){
+      const chip=document.createElement('div');
+      chip.className='ann-chip pain';
+      chip.style.left=Math.round(YAXIS_W+i*dayW)+'px';
+      chip.textContent=`Pain +${d.sess.pain-prevPain} (${prevPain}→${d.sess.pain})`;
+      inner.appendChild(chip);
+    }
+    if(lastSessI!=null && i-lastSessI>3){
+      const g=i-lastSessI-1;
+      const chip=document.createElement('div');
+      chip.className='ann-chip gap';
+      chip.style.left=Math.round(YAXIS_W+(lastSessI+1)*dayW)+'px';
+      chip.textContent=`${g}-day gap`;
+      inner.appendChild(chip);
+    }
+    prevPain=d.sess.pain; lastSessI=i;
+  });
+}
+
+/* ============================================================
+   LEGEND
+   ============================================================ */
+function buildLegend(gKeys){
+  const el=document.getElementById('legAcc');
+  el.innerHTML=gKeys.map(k=>`
+    <div class="leg-row">
+      <span class="leg-swatch" style="background:${GCONF[k].color};">
+        <svg viewBox="0 0 8 8"><polyline points="0,6 4,2 8,6" fill="none" stroke="white" stroke-width="1.5"/></svg>
+      </span>
+      ${GCONF[k].label}
+    </div>`).join('');
+}
+
+/* ============================================================
+   SCROLL SYNC
+   ============================================================ */
+const SCROLL_IDS = ['scrollAcc','scrollPain','scrollMins','topHeaderScroll','footerScroll','annotScroll'];
+let _syncing = false;
+function syncScroll(){
+  SCROLL_IDS.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.onscroll=()=>{
+      if(_syncing) return;
+      _syncing=true;
+      const sl=el.scrollLeft;
+      SCROLL_IDS.forEach(id2=>{
+        const el2=document.getElementById(id2);
+        if(el2&&el2!==el) el2.scrollLeft=sl;
+      });
+      _syncing=false;
+    };
+  });
+}
+
+/* ============================================================
+   MAIN DRAW
+   ============================================================ */
+function draw(){
+  const filter = document.getElementById('gsel').value;
+  const gKeys = Object.keys(GCONF).filter(k=>filter==='all'||filter===k);
+  const days = DAY_DATA; // always all 147 days
+
+  const dayW = getDayW();
+  const totalW = getTotalW(dayW);
+
+  // Chart heights
+  const accH=200, painH=110, minsH=120;
+  const accPlot  = accH  - PAD_TOP - PAD_BOT;
+  const painPlot = painH - PAD_TOP - PAD_BOT;
+  const minsPlot = minsH - PAD_TOP - PAD_BOT;
+  const headerH  = 44;
+
+  // ---- HEADER ----
+  {
+    const c=document.getElementById('cHeader');
+    const ctx=resetCanvas(c, totalW, headerH);
+    drawHeader(ctx, dayW, totalW, days, false);
+  }
+
+  // ---- FOOTER (mirror of header) ----
+  {
+    const c=document.getElementById('cFooter');
+    const ctx=resetCanvas(c, totalW, headerH);
+    drawHeader(ctx, dayW, totalW, days, true);
+  }
+
+  // ---- ANNOTATIONS ----
+  buildAnnot(days, dayW, totalW);
+  document.getElementById('annotScroll').style.width='';
+  document.getElementById('annotInner').style.minWidth=totalW+'px';
+
+  // ---- ACCURACY ----
+  {
+    const c=document.getElementById('cAcc');
+    const ctx=resetCanvas(c, totalW, accH);
+    drawAccuracy(ctx, dayW, totalW, days, gKeys, accPlot);
+  }
+
+  // ---- PAIN ----
+  {
+    const c=document.getElementById('cPain');
+    const ctx=resetCanvas(c, totalW, painH);
+    drawPain(ctx, dayW, totalW, days, painPlot);
+  }
+
+  // ---- MINUTES ----
+  {
+    const c=document.getElementById('cMins');
+    const ctx=resetCanvas(c, totalW, minsH);
+    drawMins(ctx, dayW, totalW, days, minsPlot);
+  }
+
+  // ---- LEGEND ----
+  buildLegend(gKeys);
+
+  // ---- SYNC + SNAP ----
+  syncScroll();
+  setTimeout(()=>snapToRecent(dayW), 80);
+}
+
+/* ============================================================
+   RESIZE OBSERVER
+   ============================================================ */
+const ro = new ResizeObserver(()=>draw());
+ro.observe(document.getElementById('scrollAcc'));
+
+draw();
+</script>
+</body>
+</html>

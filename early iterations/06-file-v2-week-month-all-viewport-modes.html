@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignWave — Tyler M. Patient Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+/* ============================================================
+   TOKENS & RESET
+   ============================================================ */
+:root {
+  --bg:        #f7f6f3;
+  --surface:   #ffffff;
+  --surface2:  #f0eeea;
+  --border:    rgba(0,0,0,0.09);
+  --border-md: rgba(0,0,0,0.15);
+  --text-pri:  #1a1916;
+  --text-sec:  #6b6860;
+  --text-ter:  #9e9c97;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --font:      'DM Sans', system-ui, sans-serif;
+  --green:     #1D9E75;
+  --red:       #E24B4A;
+  --amber:     #EF9F27;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text-pri);
+  min-height: 100vh;
+  padding: 0 0 80px;
+}
+button { font-family: var(--font); cursor: pointer; }
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.page-header {
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  padding: 20px 28px 16px;
+  display: flex; align-items: flex-start; gap: 24px; flex-wrap: wrap;
+}
+.patient-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: #E6F1FB; display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 600; color: #185FA5; flex-shrink: 0;
+}
+.patient-info h1 { font-size: 17px; font-weight: 600; line-height: 1.2; }
+.patient-info p  { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+.header-meta { display: flex; gap: 20px; margin-left: auto; align-items: center; flex-wrap: wrap; }
+.meta-item .label { font-size: 11px; color: var(--text-ter); text-transform: uppercase; letter-spacing:.04em; }
+.meta-item .value { font-size: 13px; font-weight: 500; margin-top: 1px; }
+
+/* ============================================================
+   TOOLBAR
+   ============================================================ */
+.toolbar {
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  padding: 10px 28px;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  position: sticky; top: 0; z-index: 100;
+}
+.toolbar-group { display: flex; gap: 6px; align-items: center; }
+.toolbar-group label { font-size: 12px; color: var(--text-sec); }
+.spacer { flex: 1; }
+
+.seg {
+  display: flex;
+  border: 0.5px solid var(--border-md);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.seg button {
+  background: transparent; border: none;
+  border-right: 0.5px solid var(--border-md);
+  padding: 5px 12px; font-size: 12px; color: var(--text-sec);
+  transition: background .12s, color .12s;
+}
+.seg button:last-child { border-right: none; }
+.seg button.act { background: var(--text-pri); color: #fff; }
+
+select {
+  font-family: var(--font); font-size: 12px;
+  padding: 5px 10px; border-radius: var(--radius-sm);
+  border: 0.5px solid var(--border-md);
+  background: var(--surface); color: var(--text-pri);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b6860' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center; padding-right: 24px;
+}
+
+.vis-toggle-group { display: flex; gap: 4px; align-items: center; }
+.vis-toggle-group .vtlabel { font-size: 11px; color: var(--text-ter); margin-right: 2px; text-transform: uppercase; letter-spacing:.04em; }
+.lane-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 20px; font-size: 11px;
+  border: 0.5px solid var(--border-md);
+  background: var(--surface); color: var(--text-sec);
+  cursor: pointer; transition: all .12s; user-select: none;
+}
+.lane-pill.on { background: var(--text-pri); color: #fff; border-color: var(--text-pri); }
+.lane-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity:.7; }
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+.dashboard { padding: 20px 28px 0; display: flex; flex-direction: column; gap: 0; }
+
+.lane {
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  margin-bottom: 10px; overflow: hidden;
+}
+.lane.collapsed .lane-body { display: none; }
+
+.lane-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px 9px 12px;
+  cursor: pointer; border-bottom: 0.5px solid var(--border);
+  user-select: none;
+}
+.lane.collapsed .lane-header { border-bottom: none; }
+.lane-header:hover { background: var(--surface2); }
+.lane-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing:.05em; color: var(--text-sec); }
+.lane-subtitle { font-size: 11px; color: var(--text-ter); font-weight: 400; text-transform: none; letter-spacing: 0; }
+.lane-chevron { margin-left: auto; color: var(--text-ter); transition: transform .2s; font-size: 10px; }
+.lane.collapsed .lane-chevron { transform: rotate(-90deg); }
+
+/* Each lane body: full width, scrollable, chart fills it */
+.lane-body { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.lane-body::-webkit-scrollbar { height: 3px; }
+.lane-body::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 2px; }
+
+/* chart canvas wrapper — height is STATIC via CSS, width is set by JS.
+   Chart.js with maintainAspectRatio:false fills the CSS height exactly. */
+.chart-wrap { position: relative; overflow: hidden; }
+/* Chart heights set dynamically by prepCanvas() in JS */
+
+/* Annotation lane */
+.annot-body { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.annot-body::-webkit-scrollbar { height: 3px; }
+.annot-body::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 2px; }
+.annot-inner { position: relative; height: 28px; }
+.ann-chip {
+  position: absolute; top: 3px; height: 22px;
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; padding: 0 7px;
+  font-size: 10px; font-weight: 600; white-space: nowrap;
+  cursor: default; border: 0.5px solid;
+}
+.ann-chip.pain { background:#FCEBEB; color:#791F1F; border-color:#F09595; }
+.ann-chip.gap  { background:#FAEEDA; color:#633806; border-color:#EF9F27; }
+
+/* Legend */
+.legend { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 14px 0; }
+.leg-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-sec); }
+.leg-dash { width: 14px; height: 3px; border-radius: 2px; }
+.leg-note { font-size: 10px; color: var(--text-ter); }
+
+.ann-legend { display: flex; gap: 14px; padding: 6px 14px 8px; }
+.ann-leg-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-sec); }
+.ann-leg-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+/* Footer */
+.dash-footer {
+  font-size: 11px; color: var(--text-ter);
+  padding: 10px 28px;
+  display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+}
+.min-key { display: flex; align-items: center; gap: 4px; }
+.min-key .swatch { width: 10px; height: 10px; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="page-header">
+  <div class="patient-avatar">TM</div>
+  <div class="patient-info">
+    <h1>Tyler M.</h1>
+    <p>27 · Soldier · Distal radius fracture — closed reduction &amp; casting</p>
+  </div>
+  <div class="header-meta">
+    <div class="meta-item">
+      <div class="label">Cast removed</div>
+      <div class="value">Jan 8, 2024</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Sessions</div>
+      <div class="value">42</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Current week</div>
+      <div class="value">W26</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Status</div>
+      <div class="value" style="color:var(--green)">Return to duty ✓</div>
+    </div>
+  </div>
+</header>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="toolbar-group">
+    <div class="seg" id="viewSeg">
+      <button onclick="setView('week',this)">Week</button>
+      <button onclick="setView('month',this)">Month</button>
+      <button class="act" onclick="setView('all',this)">All</button>
+    </div>
+  </div>
+  <div class="toolbar-group">
+    <div class="seg" id="axisSeg">
+      <button class="act" onclick="setAxis('week',this)">W+0</button>
+      <button onclick="setAxis('cal',this)">Date</button>
+    </div>
+  </div>
+  <div class="toolbar-group">
+    <label for="gsel">Gestures</label>
+    <select id="gsel" onchange="render()">
+      <option value="all">All active</option>
+      <option value="extension">Extension</option>
+      <option value="hook">Hook</option>
+      <option value="tabletop">Tabletop</option>
+      <option value="closed">Closed Fist</option>
+      <option value="flat">Flat Fist</option>
+    </select>
+  </div>
+  <div class="spacer"></div>
+  <div class="vis-toggle-group">
+    <span class="vtlabel">Lanes</span>
+    <span class="lane-pill on" data-lane="laneEvents"   onclick="toggleLane(this)"><span class="dot"></span>Events</span>
+    <span class="lane-pill on" data-lane="laneAccuracy" onclick="toggleLane(this)"><span class="dot"></span>Accuracy</span>
+    <span class="lane-pill on" data-lane="laneQuality"  onclick="toggleLane(this)"><span class="dot"></span>Quality</span>
+    <span class="lane-pill on" data-lane="laneSpeed"    onclick="toggleLane(this)"><span class="dot"></span>Speed</span>
+    <span class="lane-pill on" data-lane="lanePain"     onclick="toggleLane(this)"><span class="dot"></span>Pain</span>
+    <span class="lane-pill on" data-lane="laneMinutes"  onclick="toggleLane(this)"><span class="dot"></span>Minutes</span>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard">
+
+  <div class="lane" id="laneEvents">
+    <div class="lane-header" onclick="collapseLane('laneEvents')">
+      <span class="lane-title">Significant events</span>
+      <span class="lane-chevron">▾</span>
+    </div>
+    <div class="lane-body">
+      <div class="ann-legend">
+        <span class="ann-leg-item"><span class="ann-leg-dot" style="background:#F09595;border:0.5px solid #E24B4A;"></span>Pain spike (+3 pts)</span>
+        <span class="ann-leg-item"><span class="ann-leg-dot" style="background:#EF9F27;border:0.5px solid #BA7517;"></span>Gap in play (3+ days)</span>
+      </div>
+      <div class="annot-body" id="annotOuter">
+        <div class="annot-inner" id="annotInner"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lane" id="laneAccuracy">
+    <div class="lane-header" onclick="collapseLane('laneAccuracy')">
+      <span class="lane-title">Gesture accuracy</span>
+      <span class="lane-subtitle">&nbsp;— calibrated hit rate %</span>
+      <span class="lane-chevron">▾</span>
+    </div>
+    <div class="lane-body" id="s0">
+      <div class="legend" id="leg0"></div>
+      <div class="chart-wrap" id="w0"><canvas id="c0" role="img" aria-label="Gesture accuracy"></canvas></div>
+    </div>
+  </div>
+
+  <div class="lane" id="laneQuality">
+    <div class="lane-header" onclick="collapseLane('laneQuality')">
+      <span class="lane-title">Gesture quality</span>
+      <span class="lane-subtitle">&nbsp;— closeness to absolute form · box=IQR · line=median · whiskers=range</span>
+      <span class="lane-chevron">▾</span>
+    </div>
+    <div class="lane-body" id="s1">
+      <div class="chart-wrap" id="w1"><canvas id="c1" role="img" aria-label="Gesture quality"></canvas></div>
+    </div>
+  </div>
+
+  <div class="lane" id="laneSpeed">
+    <div class="lane-header" onclick="collapseLane('laneSpeed')">
+      <span class="lane-title">Speed score</span>
+      <span class="lane-subtitle">&nbsp;— normalized 0–100, higher=faster · band=IQR</span>
+      <span class="lane-chevron">▾</span>
+    </div>
+    <div class="lane-body" id="s2">
+      <div class="chart-wrap" id="w2"><canvas id="c2" role="img" aria-label="Speed score"></canvas></div>
+    </div>
+  </div>
+
+  <div class="lane" id="lanePain">
+    <div class="lane-header" onclick="collapseLane('lanePain')">
+      <span class="lane-title">Self-reported pain</span>
+      <span class="lane-subtitle">&nbsp;— 0–10 scale</span>
+      <span class="lane-chevron">▾</span>
+    </div>
+    <div class="lane-body" id="s3">
+      <div class="chart-wrap" id="w3"><canvas id="c3" role="img" aria-label="Pain score"></canvas></div>
+    </div>
+  </div>
+
+  <div class="lane" id="laneMinutes">
+    <div class="lane-header" onclick="collapseLane('laneMinutes')">
+      <span class="lane-title">Minutes played</span>
+      <span class="lane-subtitle">&nbsp;— session duration</span>
+      <span class="lane-chevron">▾</span>
+    </div>
+    <div class="lane-body" id="s4">
+      <div class="chart-wrap" id="w4"><canvas id="c4" role="img" aria-label="Minutes played"></canvas></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="dash-footer">
+  <span class="min-key"><span class="swatch" style="background:#1D9E75;"></span>20+ min</span>
+  <span class="min-key"><span class="swatch" style="background:#378ADD;"></span>14–19 min</span>
+  <span class="min-key"><span class="swatch" style="background:#D4537E;"></span>&lt;14 min</span>
+  <span style="margin-left:8px;">Week/Month views scroll — drag left for history. All view aggregates by week.</span>
+</div>
+
+<!-- ============================================================
+     SCRIPT
+     ============================================================ -->
+<script>
+/* ----------------------------------------------------------
+   CONSTANTS & CONFIG
+   ---------------------------------------------------------- */
+const START = new Date(2024, 0, 8); // cast removal = day 0
+const TOTAL_DAYS = 21 * 7;          // weeks 6–26 = 147 days
+
+const GCONF = {
+  extension: { label:'Extension',   color:'#378ADD', dash:[] },
+  hook:      { label:'Hook',        color:'#D4537E', dash:[6,3] },
+  tabletop:  { label:'Tabletop',    color:'#1D9E75', dash:[2,2] },
+  closed:    { label:'Closed Fist', color:'#BA7517', dash:[8,2,2,2] },
+  flat:      { label:'Flat Fist',   color:'#7F77DD', dash:[4,2] },
+};
+const GFIELD = { extension:'ext', hook:'hk', tabletop:'tb', closed:'cf', flat:'ff' };
+const GSTART = { extension:6, hook:6, tabletop:8, closed:12, flat:22 };
+
+const SESS_RAW = [
+  {wk:6, dy:1, pain:7, mins:8,  ext:{h:6,a:20},  hk:{h:5,a:20},  tb:null,        cf:null,        ff:null,        note:'First session — calibration day.'},
+  {wk:6, dy:3, pain:6, mins:10, ext:{h:8,a:20},  hk:{h:7,a:20},  tb:null,        cf:null,        ff:null,        note:''},
+  {wk:6, dy:5, pain:7, mins:9,  ext:{h:9,a:20},  hk:{h:8,a:20},  tb:null,        cf:null,        ff:null,        note:''},
+  {wk:7, dy:1, pain:6, mins:11, ext:{h:10,a:20}, hk:{h:9,a:20},  tb:null,        cf:null,        ff:null,        note:''},
+  {wk:7, dy:4, pain:5, mins:12, ext:{h:11,a:20}, hk:{h:10,a:20}, tb:null,        cf:null,        ff:null,        note:''},
+  {wk:8, dy:1, pain:6, mins:13, ext:{h:10,a:20}, hk:{h:10,a:20}, tb:{h:5,a:20},  cf:null,        ff:null,        note:'Tabletop introduced'},
+  {wk:8, dy:3, pain:5, mins:14, ext:{h:11,a:20}, hk:{h:11,a:20}, tb:{h:6,a:20},  cf:null,        ff:null,        note:''},
+  {wk:8, dy:6, pain:6, mins:13, ext:{h:12,a:20}, hk:{h:10,a:20}, tb:{h:7,a:20},  cf:null,        ff:null,        note:''},
+  {wk:9, dy:2, pain:8, mins:10, ext:{h:9,a:20},  hk:{h:8,a:20},  tb:{h:5,a:20},  cf:null,        ff:null,        note:'Pain spike — overuse reported'},
+  {wk:10,dy:1, pain:6, mins:12, ext:{h:11,a:20}, hk:{h:10,a:20}, tb:{h:8,a:20},  cf:null,        ff:null,        note:'9-day gap (rest period)'},
+  {wk:10,dy:4, pain:5, mins:14, ext:{h:12,a:20}, hk:{h:11,a:20}, tb:{h:9,a:20},  cf:null,        ff:null,        note:''},
+  {wk:11,dy:2, pain:4, mins:15, ext:{h:13,a:20}, hk:{h:12,a:20}, tb:{h:10,a:20}, cf:null,        ff:null,        note:''},
+  {wk:11,dy:5, pain:4, mins:16, ext:{h:14,a:20}, hk:{h:13,a:20}, tb:{h:11,a:20}, cf:null,        ff:null,        note:''},
+  {wk:12,dy:1, pain:4, mins:17, ext:{h:14,a:20}, hk:{h:13,a:20}, tb:{h:12,a:20}, cf:{h:5,a:20},  ff:null,        note:'Closed Fist introduced'},
+  {wk:12,dy:4, pain:4, mins:18, ext:{h:15,a:20}, hk:{h:14,a:20}, tb:{h:12,a:20}, cf:{h:6,a:20},  ff:null,        note:''},
+  {wk:13,dy:1, pain:3, mins:18, ext:{h:15,a:20}, hk:{h:14,a:20}, tb:{h:13,a:20}, cf:{h:7,a:20},  ff:null,        note:''},
+  {wk:13,dy:3, pain:3, mins:19, ext:{h:16,a:20}, hk:{h:15,a:20}, tb:{h:13,a:20}, cf:{h:8,a:20},  ff:null,        note:''},
+  {wk:13,dy:6, pain:4, mins:17, ext:{h:15,a:20}, hk:{h:14,a:20}, tb:{h:13,a:20}, cf:{h:7,a:20},  ff:null,        note:''},
+  {wk:14,dy:2, pain:3, mins:19, ext:{h:16,a:20}, hk:{h:15,a:20}, tb:{h:14,a:20}, cf:{h:9,a:20},  ff:null,        note:''},
+  {wk:14,dy:5, pain:3, mins:20, ext:{h:17,a:20}, hk:{h:16,a:20}, tb:{h:15,a:20}, cf:{h:10,a:20}, ff:null,        note:''},
+  {wk:15,dy:2, pain:3, mins:20, ext:{h:17,a:20}, hk:{h:16,a:20}, tb:{h:15,a:20}, cf:{h:11,a:20}, ff:null,        note:''},
+  {wk:15,dy:5, pain:2, mins:21, ext:{h:18,a:20}, hk:{h:17,a:20}, tb:{h:16,a:20}, cf:{h:12,a:20}, ff:null,        note:''},
+  {wk:16,dy:2, pain:3, mins:20, ext:{h:17,a:20}, hk:{h:17,a:20}, tb:{h:15,a:20}, cf:{h:11,a:20}, ff:null,        note:''},
+  {wk:17,dy:1, pain:6, mins:11, ext:{h:14,a:20}, hk:{h:13,a:20}, tb:{h:12,a:20}, cf:{h:8,a:20},  ff:null,        note:'Pain spike — duty-related strain'},
+  {wk:18,dy:2, pain:4, mins:15, ext:{h:15,a:20}, hk:{h:14,a:20}, tb:{h:13,a:20}, cf:{h:10,a:20}, ff:null,        note:'10-day gap'},
+  {wk:18,dy:5, pain:3, mins:17, ext:{h:16,a:20}, hk:{h:15,a:20}, tb:{h:14,a:20}, cf:{h:11,a:20}, ff:null,        note:''},
+  {wk:19,dy:1, pain:3, mins:19, ext:{h:17,a:20}, hk:{h:16,a:20}, tb:{h:15,a:20}, cf:{h:12,a:20}, ff:null,        note:''},
+  {wk:19,dy:3, pain:2, mins:20, ext:{h:18,a:20}, hk:{h:17,a:20}, tb:{h:16,a:20}, cf:{h:13,a:20}, ff:null,        note:''},
+  {wk:19,dy:6, pain:2, mins:21, ext:{h:18,a:20}, hk:{h:17,a:20}, tb:{h:16,a:20}, cf:{h:14,a:20}, ff:null,        note:''},
+  {wk:20,dy:2, pain:2, mins:22, ext:{h:19,a:20}, hk:{h:18,a:20}, tb:{h:17,a:20}, cf:{h:15,a:20}, ff:null,        note:''},
+  {wk:20,dy:5, pain:2, mins:22, ext:{h:19,a:20}, hk:{h:18,a:20}, tb:{h:17,a:20}, cf:{h:15,a:20}, ff:null,        note:''},
+  {wk:21,dy:2, pain:2, mins:22, ext:{h:19,a:20}, hk:{h:18,a:20}, tb:{h:17,a:20}, cf:{h:16,a:20}, ff:null,        note:''},
+  {wk:22,dy:1, pain:2, mins:23, ext:{h:19,a:20}, hk:{h:18,a:20}, tb:{h:18,a:20}, cf:{h:16,a:20}, ff:{h:5,a:20},  note:'Flat Fist introduced'},
+  {wk:22,dy:4, pain:2, mins:23, ext:{h:19,a:20}, hk:{h:19,a:20}, tb:{h:18,a:20}, cf:{h:16,a:20}, ff:{h:6,a:20},  note:''},
+  {wk:23,dy:1, pain:2, mins:24, ext:{h:20,a:20}, hk:{h:19,a:20}, tb:{h:18,a:20}, cf:{h:17,a:20}, ff:{h:8,a:20},  note:''},
+  {wk:23,dy:4, pain:1, mins:24, ext:{h:20,a:20}, hk:{h:19,a:20}, tb:{h:19,a:20}, cf:{h:17,a:20}, ff:{h:9,a:20},  note:''},
+  {wk:24,dy:1, pain:1, mins:25, ext:{h:20,a:20}, hk:{h:19,a:20}, tb:{h:19,a:20}, cf:{h:18,a:20}, ff:{h:11,a:20}, note:''},
+  {wk:24,dy:4, pain:1, mins:25, ext:{h:20,a:20}, hk:{h:20,a:20}, tb:{h:19,a:20}, cf:{h:18,a:20}, ff:{h:12,a:20}, note:''},
+  {wk:25,dy:2, pain:1, mins:25, ext:{h:20,a:20}, hk:{h:20,a:20}, tb:{h:20,a:20}, cf:{h:19,a:20}, ff:{h:14,a:20}, note:''},
+  {wk:25,dy:5, pain:1, mins:26, ext:{h:20,a:20}, hk:{h:20,a:20}, tb:{h:20,a:20}, cf:{h:19,a:20}, ff:{h:15,a:20}, note:''},
+  {wk:26,dy:2, pain:1, mins:26, ext:{h:20,a:20}, hk:{h:20,a:20}, tb:{h:20,a:20}, cf:{h:20,a:20}, ff:{h:16,a:20}, note:''},
+  {wk:26,dy:5, pain:1, mins:27, ext:{h:20,a:20}, hk:{h:20,a:20}, tb:{h:20,a:20}, cf:{h:20,a:20}, ff:{h:17,a:20}, note:'Final assessment — cleared for return to duty.'},
+];
+
+/* ----------------------------------------------------------
+   HELPERS
+   ---------------------------------------------------------- */
+function addDays(d,n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+function fmtWeek(d){ const diff=Math.round((d-START)/86400000); return `W${Math.floor(diff/7)+6}·D${diff%7+1}`; }
+function fmtCal(d){ return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+function fmtWeekLabel(w){ return `W${w}`; }
+function sessDate(s){ return addDays(START,(s.wk-6)*7+(s.dy-1)); }
+function arrAvg(a){ return a.length ? Math.round(a.reduce((x,y)=>x+y,0)/a.length) : null; }
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+function autoY(vals, hardMin=0, hardMax=100, pad=5){
+  const c=vals.filter(v=>v!=null&&isFinite(v));
+  if(!c.length) return {min:hardMin,max:hardMax};
+  let lo=Math.max(hardMin, Math.floor((Math.min(...c)-pad)/5)*5);
+  let hi=Math.min(hardMax==null?Infinity:hardMax, Math.ceil((Math.max(...c)+pad)/5)*5);
+  if(hi-lo<10) hi=Math.min(hardMax==null?lo+30:hardMax, lo+10);
+  return {min:lo, max:hi};
+}
+
+/* Session lookup by ISO date string */
+const SESS_MAP = {};
+SESS_RAW.forEach((s,si)=>{ SESS_MAP[sessDate(s).toISOString().slice(0,10)]={...s,si}; });
+
+/* All calendar dates */
+function allDates(){ const a=[]; for(let i=0;i<TOTAL_DAYS;i++) a.push(addDays(START,i)); return a; }
+
+/* Weekly aggregation buckets (weeks 6–26) */
+function weekBuckets(){
+  const buckets=[];
+  for(let w=6;w<=26;w++){
+    const days=[];
+    for(let d=1;d<=7;d++){
+      const off=(w-6)*7+(d-1);
+      if(off<TOTAL_DAYS) days.push(addDays(START,off));
+    }
+    buckets.push({wk:w, days, label:`W${w}`, date:days[0]});
+  }
+  return buckets;
+}
+
+/* ----------------------------------------------------------
+   SIMULATED STATS
+   ---------------------------------------------------------- */
+function qualityStats(si,gk,pain){
+  const prog=Math.min(1,si/41), pp=pain>=7?0.15:pain>=5?0.07:0;
+  const bases={ff:.20,cf:.25,tb:.28,hk:.30,ext:.32};
+  const gains={ff:.55,cf:.58,tb:.55,hk:.52,ext:.50};
+  const bm=Math.max(0.12,(bases[gk]||.3)+prog*(gains[gk]||.5)-pp);
+  const spr=Math.max(0.05,.22-prog*.14+pp*.5);
+  const med=Math.round(bm*100), q1=Math.round(clamp(bm-spr*.7,0,1)*100),
+        q3=Math.round(clamp(bm+spr*.5,0,1)*100),
+        wMin=Math.round(clamp(bm-spr*1.3,0,1)*100),
+        wMax=Math.round(clamp(bm+spr*.9,0,1)*100);
+  return {med,q1,q3,wMin,wMax};
+}
+function speedStats(si,gk,pain,acc){
+  const prog=Math.min(1,si/41), pp=pain>=7?18:pain>=5?10:0;
+  const bases={ff:15,cf:18,tb:20,hk:22,ext:25};
+  const gains={ff:52,cf:54,tb:52,hk:50,ext:48};
+  const bm=clamp((bases[gk]||20)+prog*(gains[gk]||50)-pp+(acc-50)*.15,5,95);
+  const spr=Math.max(4,28-prog*18+pp*.4);
+  return {med:Math.round(bm),q1:Math.max(2,Math.round(bm-spr*.7)),q3:Math.min(98,Math.round(bm+spr*.5))};
+}
+
+/* Aggregate a set of days into box stats for quality */
+function aggQualBox(days,gk){
+  const sess=days.map(d=>SESS_MAP[d.toISOString().slice(0,10)]).filter(s=>s&&s[gk]);
+  if(!sess.length) return null;
+  const stats=sess.map(s=>qualityStats(s.si,gk,s.pain));
+  return {
+    med: arrAvg(stats.map(s=>s.med)), q1:arrAvg(stats.map(s=>s.q1)),
+    q3:  arrAvg(stats.map(s=>s.q3)), wMin:Math.min(...stats.map(s=>s.wMin)),
+    wMax:Math.max(...stats.map(s=>s.wMax))
+  };
+}
+function aggAcc(days,gk){
+  const vals=days.map(d=>{const s=SESS_MAP[d.toISOString().slice(0,10)];return s&&s[gk]?Math.round(s[gk].h/s[gk].a*100):null;}).filter(x=>x!=null);
+  return vals.length?arrAvg(vals):null;
+}
+function aggSpeed(days,gk){
+  const sess=days.map(d=>SESS_MAP[d.toISOString().slice(0,10)]).filter(s=>s&&s[gk]);
+  if(!sess.length) return null;
+  const stats=sess.map(s=>speedStats(s.si,gk,s.pain,Math.round(s[gk].h/s[gk].a*100)));
+  return {med:arrAvg(stats.map(s=>s.med)),q1:arrAvg(stats.map(s=>s.q1)),q3:arrAvg(stats.map(s=>s.q3))};
+}
+function aggPain(days){
+  const vals=days.map(d=>{const s=SESS_MAP[d.toISOString().slice(0,10)];return s?s.pain:null;}).filter(x=>x!=null);
+  return vals.length?arrAvg(vals):null;
+}
+function aggMins(days){ return days.reduce((acc,d)=>{const s=SESS_MAP[d.toISOString().slice(0,10)];return acc+(s?s.mins:0);},0); }
+
+/* ----------------------------------------------------------
+   VIEW STATE
+   viewMode: 'week' | 'month' | 'all'
+   axisMode: 'week' | 'cal'
+   ---------------------------------------------------------- */
+let viewMode = 'all', axisMode = 'week';
+
+function setView(m,btn){
+  viewMode=m;
+  document.querySelectorAll('#viewSeg button').forEach(b=>b.classList.remove('act'));
+  btn.classList.add('act');
+  render();
+}
+function setAxis(m,btn){
+  axisMode=m;
+  document.querySelectorAll('#axisSeg button').forEach(b=>b.classList.remove('act'));
+  btn.classList.add('act');
+  render();
+}
+function collapseLane(id){ document.getElementById(id).classList.toggle('collapsed'); }
+function toggleLane(pill){
+  const lane=document.getElementById(pill.dataset.lane);
+  pill.classList.toggle('on');
+  lane.style.display=pill.classList.contains('on')?'':'none';
+}
+
+/* ----------------------------------------------------------
+   SLOT BUILDING
+   Returns { labels, dates, slotDays[], isWeekly }
+   slotDays[i] = array of Date objects in that slot
+   ---------------------------------------------------------- */
+function buildSlots(){
+  if(viewMode==='all'){
+    // One slot per week, aggregated
+    const buckets=weekBuckets();
+    return {
+      labels: buckets.map(b=>axisMode==='cal'?fmtCal(b.date):b.label),
+      dates:  buckets.map(b=>b.date),
+      slotDays: buckets.map(b=>b.days),
+      isWeekly: true,
+      totalCols: buckets.length,
+    };
+  }
+  // Week and Month: session-level (one slot per calendar day)
+  const days=allDates();
+  return {
+    labels:   days.map(d=>axisMode==='cal'?fmtCal(d):fmtWeek(d)),
+    dates:    days,
+    slotDays: days.map(d=>[d]),
+    isWeekly: false,
+    totalCols: days.length,
+  };
+}
+
+/* Container width via ResizeObserver */
+function getContainerW(){
+  const el=document.getElementById('s0');
+  return el ? el.clientWidth || 760 : 760;
+}
+
+/* ----------------------------------------------------------
+   CHART GEOMETRY
+   viewMode drives px-per-column and total canvas width:
+     all   → fit exactly to container (no scroll)
+     month → 28 session-days visible in container width → px = containerW/28, total = 147 days
+     week  → 7 session-days visible → px = containerW/7
+   ---------------------------------------------------------- */
+function getGeometry(totalCols){
+  const cw=getContainerW();
+  if(viewMode==='all'){
+    // fit all weekly cols into container — no scroll
+    return { pxPer: cw/totalCols, totalW: cw };
+  }
+  if(viewMode==='month'){
+    const pxPer=cw/28;   // 28 days fills viewport
+    return { pxPer, totalW: Math.round(pxPer*totalCols) };
+  }
+  // week: 7 days fills viewport
+  const pxPer=cw/7;
+  return { pxPer, totalW: Math.round(pxPer*totalCols) };
+}
+
+/* After render, scroll all scrollers to right edge */
+function snapToRecent(){
+  if(viewMode==='all') return; // no scroll in 'all'
+  const ids=['annotOuter','s0','s1','s2','s3','s4'];
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.scrollLeft=el.scrollWidth;
+  });
+}
+
+/* ----------------------------------------------------------
+   ANNOTATION DETECTION (operates on calendar days)
+   ---------------------------------------------------------- */
+function detectEvents(days){
+  const events=[];
+  let prevPain=null, lastIdx=null;
+  days.forEach((d,i)=>{
+    const s=SESS_MAP[d.toISOString().slice(0,10)];
+    if(s){
+      if(prevPain!=null&&s.pain-prevPain>=3)
+        events.push({startIdx:i,span:1,type:'pain',label:`Pain +${s.pain-prevPain} (${prevPain}→${s.pain})`});
+      if(lastIdx!=null&&i-lastIdx>3){
+        const g=i-lastIdx-1;
+        events.push({startIdx:lastIdx+1,span:g,type:'gap',label:`${g}-day gap`});
+      }
+      prevPain=s.pain; lastIdx=i;
+    }
+  });
+  return events;
+}
+
+function detectEventsWeekly(buckets){
+  // map session-level events to nearest week bucket index
+  const events=[];
+  let prevPain=null;
+  SESS_RAW.forEach((s,si)=>{
+    if(prevPain!=null&&s.pain-prevPain>=3){
+      const sd=sessDate(s);
+      const idx=buckets.findIndex(b=>Math.abs(b.date-sd)<86400000*3.5);
+      if(idx>=0) events.push({startIdx:idx,span:1,type:'pain',label:`Pain +${s.pain-prevPain}`});
+    }
+    if(si>0){
+      const gap=Math.round((sessDate(s)-sessDate(SESS_RAW[si-1]))/86400000)-1;
+      if(gap>=3){
+        const prev=sessDate(SESS_RAW[si-1]);
+        const idx=buckets.findIndex(b=>Math.abs(b.date-prev)<86400000*3.5);
+        if(idx>=0&&idx+1<buckets.length)
+          events.push({startIdx:idx+1,span:1,type:'gap',label:`${gap}-day gap`});
+      }
+    }
+    prevPain=s.pain;
+  });
+  return events;
+}
+
+function buildAnnot(events,n,totalW){
+  const inner=document.getElementById('annotInner');
+  inner.style.width=totalW+'px'; inner.innerHTML='';
+  events.forEach(ev=>{
+    const chip=document.createElement('div');
+    chip.className='ann-chip '+ev.type;
+    chip.style.left=Math.round(ev.startIdx/n*totalW)+'px';
+    chip.textContent=ev.label; chip.title=ev.label;
+    inner.appendChild(chip);
+  });
+}
+
+/* ----------------------------------------------------------
+   BOX PLOT DRAWING
+   ---------------------------------------------------------- */
+function drawBoxes(chart,boxRows,gKeys){
+  const ctx=chart.ctx;
+  const {left,right}=chart.chartArea;
+  const yScale=chart.scales.y;
+  const n=boxRows[0]?boxRows[0].length:1;
+  const slotW=(right-left)/n;
+  const gCount=gKeys.length;
+  const bw=Math.max(2,Math.min(12,slotW/gCount-2));
+
+  gKeys.forEach((k,gi)=>{
+    const color=GCONF[k].color;
+    (boxRows[gi]||[]).forEach((box,i)=>{
+      if(!box)return;
+      const cx=left+(i+.5)*slotW+(gi-(gCount-1)/2)*(bw+2);
+      const yMed=yScale.getPixelForValue(box.med),
+            yQ1=yScale.getPixelForValue(box.q1),
+            yQ3=yScale.getPixelForValue(box.q3),
+            yWMin=yScale.getPixelForValue(box.wMin),
+            yWMax=yScale.getPixelForValue(box.wMax);
+      ctx.save();
+      ctx.fillStyle=color+'50'; ctx.strokeStyle=color; ctx.lineWidth=.8;
+      ctx.fillRect(cx-bw/2,yQ3,bw,yQ1-yQ3);
+      ctx.strokeRect(cx-bw/2,yQ3,bw,yQ1-yQ3);
+      ctx.beginPath(); ctx.moveTo(cx-bw/2,yMed); ctx.lineTo(cx+bw/2,yMed);
+      ctx.strokeStyle=color; ctx.lineWidth=2; ctx.stroke();
+      ctx.lineWidth=.8; ctx.strokeStyle=color+'99';
+      [[yQ1,yWMin],[yQ3,yWMax]].forEach(([a,b])=>{
+        ctx.beginPath(); ctx.moveTo(cx,a); ctx.lineTo(cx,b); ctx.stroke();
+      });
+      [yWMin,yWMax].forEach(y=>{
+        ctx.beginPath(); ctx.moveTo(cx-bw/3,y); ctx.lineTo(cx+bw/3,y); ctx.stroke();
+      });
+      ctx.restore();
+    });
+  });
+}
+
+/* ----------------------------------------------------------
+   CANVAS PRE-SIZING
+   Called BEFORE new Chart() so Chart.js sees correct dimensions
+   at construction time. Setting both width+height attributes here
+   combined with maintainAspectRatio:false means Chart.js never
+   recalculates height from aspect ratio. No resize() calls needed.
+   ---------------------------------------------------------- */
+function prepCanvas(id, w, h) {
+  const c = document.getElementById(id);
+  c.width  = w;
+  c.height = h;
+  c.style.width  = w  + 'px';
+  c.style.height = h  + 'px';
+  // Size the parent wrap to match so the lane border is correct
+  if (c.parentElement) {
+    c.parentElement.style.height = h + 'px';
+  }
+}
+
+/* ----------------------------------------------------------
+   CHARTS STATE
+   ---------------------------------------------------------- */
+let charts=[null,null,null,null,null];
+let pendingBox=null;
+
+/* ----------------------------------------------------------
+   RENDER
+   ---------------------------------------------------------- */
+function render(){
+  const filter=document.getElementById('gsel').value;
+  const slots=buildSlots();
+  const n=slots.totalCols;
+  const {pxPer,totalW}=getGeometry(n);
+
+  const tickC='#9e9c97', gridC='rgba(0,0,0,0.05)', restC='rgba(0,0,0,0.03)';
+  const gKeys=Object.keys(GCONF).filter(k=>filter==='all'||filter===k);
+
+  // Size all wrappers to totalW
+  ['w0','w1','w2','w3','w4'].forEach(id=>{ document.getElementById(id).style.width=totalW+'px'; });
+
+  const sharedX={
+    ticks:{
+      color:tickC, font:{size:10},
+      maxRotation: pxPer<20?50:0,
+      autoSkip:true,
+      maxTicksLimit: viewMode==='week'?7:viewMode==='month'?14:21,
+    },
+    grid:{color:gridC},
+  };
+  const sharedXng={...sharedX, grid:{display:false}};
+
+  // Destroy old
+  charts.forEach(c=>{if(c)c.destroy();});
+  if(pendingBox){clearTimeout(pendingBox);pendingBox=null;}
+
+  /* ---- ACCURACY ---- */
+  const accDS=gKeys.map(k=>{
+    const gk=GFIELD[k];
+    return {
+      label: GCONF[k].label,
+      data: slots.slotDays.map((days,i)=>{
+        const wkNum=Math.floor((days[0]-START)/86400000/7)+6;
+        if(wkNum<GSTART[k])return null;
+        return aggAcc(days,gk);
+      }),
+      borderColor:GCONF[k].color, backgroundColor:GCONF[k].color+'18',
+      borderWidth:1.5, borderDash:GCONF[k].dash,
+      pointRadius:viewMode==='week'?3:viewMode==='month'?2:4,
+      spanGaps:false, tension:0.35,
+    };
+  });
+  const accY=autoY(accDS.flatMap(ds=>ds.data));
+  prepCanvas('c0',totalW,240);
+  charts[0]=new Chart(document.getElementById('c0'),{
+    type:'line', data:{labels:slots.labels,datasets:accDS},
+    options:{responsive:false,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        title:items=>{
+          const i=items[0].dataIndex;
+          if(!slots.isWeekly){
+            const s=SESS_MAP[slots.dates[i].toISOString().slice(0,10)];
+            return s&&s.note?`${slots.labels[i]} — ${s.note}`:slots.labels[i];
+          }
+          return slots.labels[i];
+        },
+        label:item=>item.raw!=null?` ${item.dataset.label}: ${item.raw}%`:null,
+      }}},
+      scales:{x:sharedX, y:{...accY,ticks:{color:tickC,font:{size:10},callback:v=>v+'%'},grid:{color:gridC}}}}
+  });
+  
+
+  /* ---- QUALITY ---- */
+  const boxRows=gKeys.map(k=>{
+    const gk=GFIELD[k];
+    return slots.slotDays.map((days)=>{
+      const wkNum=Math.floor((days[0]-START)/86400000/7)+6;
+      if(wkNum<GSTART[k])return null;
+      return aggQualBox(days,gk);
+    });
+  });
+  const allQVals=boxRows.flatMap(row=>row.filter(Boolean).flatMap(b=>[b.wMin,b.med,b.wMax]));
+  const qualY=autoY(allQVals);
+  prepCanvas('c1',totalW,190);
+  const c1=new Chart(document.getElementById('c1'),{
+    type:'line',data:{labels:slots.labels,datasets:[{label:'_',data:slots.labels.map(()=>null),borderColor:'transparent',pointRadius:0}]},
+    options:{responsive:false,maintainAspectRatio:false,animation:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        title:items=>slots.labels[items[0].dataIndex], label:()=>null,
+        afterBody:items=>{const i=items[0].dataIndex;return gKeys.map((k,gi)=>{const b=boxRows[gi]&&boxRows[gi][i];return b?`${GCONF[k].label}: med ${b.med}% · IQR ${b.q1}–${b.q3}%`:null;}).filter(Boolean);}
+      }}},
+      scales:{x:sharedX, y:{...qualY,ticks:{color:tickC,font:{size:10},callback:v=>v+'%'},grid:{color:gridC}}}}
+  });
+  
+  charts[1]=c1;
+  pendingBox=setTimeout(()=>{ drawBoxes(c1,boxRows,gKeys); },120);
+
+  /* ---- SPEED ---- */
+  const speedDS=gKeys.flatMap(k=>{
+    const gk=GFIELD[k];
+    const meds=[],q1s=[],q3s=[];
+    slots.slotDays.forEach(days=>{
+      const wkNum=Math.floor((days[0]-START)/86400000/7)+6;
+      if(wkNum<GSTART[k]){meds.push(null);q1s.push(null);q3s.push(null);return;}
+      const st=aggSpeed(days,gk);
+      meds.push(st?st.med:null); q1s.push(st?st.q1:null); q3s.push(st?st.q3:null);
+    });
+    return [
+      {label:GCONF[k].label,data:meds,borderColor:GCONF[k].color,backgroundColor:'transparent',borderWidth:1.5,borderDash:GCONF[k].dash,pointRadius:viewMode==='week'?3:2,spanGaps:false,tension:0.3,order:1},
+      {label:`_q1_${k}`,data:q1s,borderColor:'transparent',backgroundColor:GCONF[k].color+'28',fill:'+1',pointRadius:0,spanGaps:false,tension:0.3,order:2},
+      {label:`_q3_${k}`,data:q3s,borderColor:'transparent',backgroundColor:'transparent',fill:false,pointRadius:0,spanGaps:false,tension:0.3,order:2},
+    ];
+  });
+  const speedMeds=gKeys.flatMap(k=>{const gk=GFIELD[k];return slots.slotDays.map(days=>{const st=aggSpeed(days,gk);return st?st.med:null;});});
+  const speedY=autoY(speedMeds);
+  prepCanvas('c2',totalW,150);
+  charts[2]=new Chart(document.getElementById('c2'),{
+    type:'line',data:{labels:slots.labels,datasets:speedDS},
+    options:{responsive:false,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{filter:i=>!i.dataset.label.startsWith('_'),
+        callbacks:{title:items=>slots.labels[items[0].dataIndex],label:item=>item.raw!=null?` ${item.dataset.label}: ${item.raw}`:null}}},
+      scales:{x:sharedX,y:{...speedY,ticks:{color:tickC,font:{size:10}},grid:{color:gridC}}}}
+  });
+  
+
+  /* ---- PAIN ---- */
+  const painVals=slots.slotDays.map(days=>aggPain(days));
+  const isSess=slots.slotDays.map(days=>days.some(d=>!!SESS_MAP[d.toISOString().slice(0,10)]));
+  const painY=autoY(painVals,0,10);
+  prepCanvas('c3',totalW,95);
+  charts[3]=new Chart(document.getElementById('c3'),{
+    type:'bar',data:{labels:slots.labels,datasets:[{label:'Pain',data:painVals,
+      backgroundColor:painVals.map(p=>p==null?restC:p>=7?'#E24B4A99':p>=5?'#EF9F2799':'#1D9E7599'),
+      borderColor:painVals.map(p=>p==null?'transparent':p>=7?'#E24B4A':p>=5?'#BA7517':'#0F6E56'),
+      borderWidth:1,borderRadius:2}]},
+    options:{responsive:false,maintainAspectRatio:false,animation:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>slots.labels[i[0].dataIndex],label:i=>i.raw!=null?` Pain: ${i.raw}/10`:' No session'}}},
+      scales:{x:sharedXng,y:{...painY,ticks:{color:tickC,font:{size:10},stepSize:1},grid:{color:gridC}}}}
+  });
+  
+
+  /* ---- MINUTES ---- */
+  const minsVals=slots.slotDays.map(days=>aggMins(days));
+  const minsY=autoY(minsVals,0,null,2);
+  prepCanvas('c4',totalW,95);
+  charts[4]=new Chart(document.getElementById('c4'),{
+    type:'bar',data:{labels:slots.labels,datasets:[{label:'Minutes',data:minsVals,
+      backgroundColor:minsVals.map((m,i)=>!isSess[i]&&!slots.isWeekly?restC:m>=20?'#1D9E7599':m>=14?'#378ADD66':'#D4537E66'),
+      borderColor:minsVals.map((m,i)=>!isSess[i]&&!slots.isWeekly?'transparent':m>=20?'#1D9E75':m>=14?'#378ADD':'#D4537E'),
+      borderWidth:1,borderRadius:2}]},
+    options:{responsive:false,maintainAspectRatio:false,animation:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>slots.labels[i[0].dataIndex],label:i=>!isSess[i[0].dataIndex]&&!slots.isWeekly?' No session':` ${i.raw} min`}}},
+      scales:{x:sharedXng,y:{...minsY,ticks:{color:tickC,font:{size:10}},grid:{color:gridC}}}}
+  });
+  
+
+  /* ---- ANNOTATIONS ---- */
+  if(slots.isWeekly){
+    buildAnnot(detectEventsWeekly(weekBuckets()),n,totalW);
+  } else {
+    buildAnnot(detectEvents(allDates()),n,totalW);
+  }
+
+  /* ---- LEGEND ---- */
+  document.getElementById('leg0').innerHTML=gKeys.map(k=>{
+    const c=GCONF[k];
+    const bg=c.dash.length?'transparent':c.color;
+    const bi=c.dash.length?`repeating-linear-gradient(90deg,${c.color} 0,${c.color} 6px,transparent 6px,transparent 9px)`:'';
+    const added=k!=='extension'&&k!=='hook'?`<span class="leg-note">(from W${GSTART[k]})</span>`:'';
+    return `<span class="leg-item"><span class="leg-dash" style="background:${bg};${bi?'background-image:'+bi:''}"></span>${c.label} ${added}</span>`;
+  }).join('');
+
+  /* ---- SYNC SCROLL ---- */
+  const scrollers=['annotOuter','s0','s1','s2','s3','s4'].map(id=>document.getElementById(id));
+  scrollers.forEach(o=>{
+    o.onscroll=()=>scrollers.forEach(x=>{ if(x!==o) x.scrollLeft=o.scrollLeft; });
+  });
+
+  /* ---- SNAP TO RECENT ---- */
+  setTimeout(snapToRecent, 150);
+}
+
+/* ----------------------------------------------------------
+   RESIZE OBSERVER — re-render when container width changes
+   ---------------------------------------------------------- */
+const ro=new ResizeObserver(()=>render());
+ro.observe(document.getElementById('s0'));
+
+/* ----------------------------------------------------------
+   INIT
+   ---------------------------------------------------------- */
+render();
+</script>
+</body>
+</html>

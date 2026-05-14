@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignWave 02 — Accuracy + Pain + Minutes, granularity toggle</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #f5f5f4; padding: 24px; color: #1a1916; }
+h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.meta { font-size: 12px; color: #888; margin-bottom: 16px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.seg { display: flex; border: 0.5px solid #ccc; border-radius: 6px; overflow: hidden; }
+.seg button { background: transparent; border: none; border-right: 0.5px solid #ccc; padding: 5px 12px; font-size: 12px; color: #666; cursor: pointer; }
+.seg button:last-child { border-right: none; }
+.seg button.active { background: #1a1916; color: #fff; }
+select { font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ccc; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.li { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #555; }
+.ld { width: 12px; height: 3px; border-radius: 1px; }
+.slabel { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing:.04em; margin-bottom: 5px; margin-top: 14px; }
+.scroll-outer { overflow-x: auto; }
+.scroll-outer::-webkit-scrollbar { height: 3px; }
+.scroll-outer::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+.chart-wrap { position: relative; }
+.fn { font-size: 11px; color: #aaa; margin-top: 10px; display: flex; gap: 12px; flex-wrap: wrap; }
+.mk { display: flex; align-items: center; gap: 4px; }
+.sw { width: 10px; height: 10px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<h1>SignWave Exploration 02</h1>
+<p class="meta">Added minutes played. Session / Week / Month granularity toggle. Gesture filter. Synced horizontal scroll. Annotation lane with pain spikes and gaps.</p>
+
+<div class="controls">
+  <div class="seg">
+    <button class="active" onclick="setGran('session',this)">Session</button>
+    <button onclick="setGran('week',this)">Week</button>
+    <button onclick="setGran('month',this)">Month</button>
+  </div>
+  <label>Gestures: <select id="gsel" onchange="renderCharts()">
+    <option value="all">All active</option>
+    <option value="extension">Extension</option>
+    <option value="hook">Hook</option>
+    <option value="tabletop">Tabletop</option>
+    <option value="closed">Closed Fist</option>
+    <option value="flat">Flat Fist</option>
+  </select></label>
+</div>
+
+<div class="legend" id="leg"></div>
+<p class="slabel">Gesture accuracy per session (%)</p>
+<div class="scroll-outer" id="s0"><div class="chart-wrap" id="w0" style="height:300px;"><canvas id="c0"></canvas></div></div>
+<p class="slabel">Minutes played</p>
+<div class="scroll-outer" id="s1"><div class="chart-wrap" id="w1" style="height:110px;"><canvas id="c1"></canvas></div></div>
+<p class="slabel">Self-reported pain (0–10)</p>
+<div class="scroll-outer" id="s2"><div class="chart-wrap" id="w2" style="height:110px;"><canvas id="c2"></canvas></div></div>
+
+<div class="fn">
+  <span class="mk"><span class="sw" style="background:#1D9E75;"></span>20+ min</span>
+  <span class="mk"><span class="sw" style="background:#378ADD;"></span>14–19 min</span>
+  <span class="mk"><span class="sw" style="background:#D4537E;"></span>&lt;14 min</span>
+  <span style="color:#bbb;margin-left:6px;">Charts scroll in sync. Session view shows every played day.</span>
+</div>
+
+<script>
+const START = new Date(2024,0,8);
+const TOTAL_DAYS = 21*7;
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+function fmtW(d){const diff=Math.round((d-START)/86400000);return`W${Math.floor(diff/7)+6}·D${diff%7+1}`;}
+
+const GCONF={
+  extension:{label:'Extension',color:'#378ADD',dash:[]},
+  hook:{label:'Hook',color:'#D4537E',dash:[6,3]},
+  tabletop:{label:'Tabletop',color:'#1D9E75',dash:[2,2]},
+  closed:{label:'Closed Fist',color:'#BA7517',dash:[8,2,2,2]},
+  flat:{label:'Flat Fist',color:'#7F77DD',dash:[4,2]},
+};
+const GFIELD={extension:'ext',hook:'hk',tabletop:'tb',closed:'cf',flat:'ff'};
+const GSTART={extension:6,hook:6,tabletop:8,closed:12,flat:22};
+
+const SESS_RAW=[
+  {wk:6,dy:1,pain:7,mins:8, ext:{h:6,a:20},hk:{h:5,a:20},tb:null,cf:null,ff:null},
+  {wk:6,dy:3,pain:6,mins:10,ext:{h:8,a:20},hk:{h:7,a:20},tb:null,cf:null,ff:null},
+  {wk:6,dy:5,pain:7,mins:9, ext:{h:9,a:20},hk:{h:8,a:20},tb:null,cf:null,ff:null},
+  {wk:7,dy:1,pain:6,mins:11,ext:{h:10,a:20},hk:{h:9,a:20},tb:null,cf:null,ff:null},
+  {wk:7,dy:4,pain:5,mins:12,ext:{h:11,a:20},hk:{h:10,a:20},tb:null,cf:null,ff:null},
+  {wk:8,dy:1,pain:6,mins:13,ext:{h:10,a:20},hk:{h:10,a:20},tb:{h:5,a:20},cf:null,ff:null},
+  {wk:8,dy:3,pain:5,mins:14,ext:{h:11,a:20},hk:{h:11,a:20},tb:{h:6,a:20},cf:null,ff:null},
+  {wk:8,dy:6,pain:6,mins:13,ext:{h:12,a:20},hk:{h:10,a:20},tb:{h:7,a:20},cf:null,ff:null},
+  {wk:9,dy:2,pain:8,mins:10,ext:{h:9,a:20},hk:{h:8,a:20},tb:{h:5,a:20},cf:null,ff:null},
+  {wk:10,dy:1,pain:6,mins:12,ext:{h:11,a:20},hk:{h:10,a:20},tb:{h:8,a:20},cf:null,ff:null},
+  {wk:10,dy:4,pain:5,mins:14,ext:{h:12,a:20},hk:{h:11,a:20},tb:{h:9,a:20},cf:null,ff:null},
+  {wk:11,dy:2,pain:4,mins:15,ext:{h:13,a:20},hk:{h:12,a:20},tb:{h:10,a:20},cf:null,ff:null},
+  {wk:11,dy:5,pain:4,mins:16,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:11,a:20},cf:null,ff:null},
+  {wk:12,dy:1,pain:4,mins:17,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:12,a:20},cf:{h:5,a:20},ff:null},
+  {wk:12,dy:4,pain:4,mins:18,ext:{h:15,a:20},hk:{h:14,a:20},tb:{h:12,a:20},cf:{h:6,a:20},ff:null},
+  {wk:15,dy:5,pain:2,mins:21,ext:{h:18,a:20},hk:{h:17,a:20},tb:{h:16,a:20},cf:{h:12,a:20},ff:null},
+  {wk:17,dy:1,pain:6,mins:11,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:12,a:20},cf:{h:8,a:20},ff:null},
+  {wk:22,dy:1,pain:2,mins:23,ext:{h:19,a:20},hk:{h:18,a:20},tb:{h:18,a:20},cf:{h:16,a:20},ff:{h:5,a:20}},
+  {wk:25,dy:5,pain:1,mins:26,ext:{h:20,a:20},hk:{h:20,a:20},tb:{h:20,a:20},cf:{h:19,a:20},ff:{h:15,a:20}},
+  {wk:26,dy:5,pain:1,mins:27,ext:{h:20,a:20},hk:{h:20,a:20},tb:{h:20,a:20},cf:{h:20,a:20},ff:{h:17,a:20}},
+];
+
+function sessDate(s){return addDays(START,(s.wk-6)*7+(s.dy-1));}
+const SESS_MAP={};
+SESS_RAW.forEach((s,si)=>{SESS_MAP[sessDate(s).toISOString().slice(0,10)]={...s,si};});
+
+let gran='session';
+let charts=[null,null,null];
+
+function setGran(g,btn){
+  gran=g;
+  document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCharts();
+}
+
+function allDates(){const a=[];for(let i=0;i<TOTAL_DAYS;i++)a.push(addDays(START,i));return a;}
+function weekGroups(){const g={};for(let w=6;w<=26;w++){g[`W${w}`]=[];for(let d=1;d<=7;d++){const off=(w-6)*7+(d-1);if(off<TOTAL_DAYS)g[`W${w}`].push(addDays(START,off));}}return g;}
+function monthGroups(){const g={};allDates().forEach(d=>{const k=d.toLocaleDateString('en-US',{month:'short',year:'numeric'});if(!g[k])g[k]=[];g[k].push(d);});return g;}
+function arrAvg(a){const v=a.filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;}
+
+function getData(){
+  if(gran==='session'){
+    const dates=allDates();
+    return{labels:dates.map(d=>fmtW(d)),dates,groups:null,keys:null};
+  }
+  if(gran==='week'){
+    const g=weekGroups();const k=Object.keys(g);const fd=k.map(kk=>g[kk][0]);
+    return{labels:k,dates:fd,groups:g,keys:k};
+  }
+  const g=monthGroups();const k=Object.keys(g);const fd=k.map(kk=>g[kk][0]);
+  return{labels:k,dates:fd,groups:g,keys:k};
+}
+
+function slotDates(data,i){
+  if(gran==='session')return[data.dates[i]];
+  return data.groups[data.keys[i]];
+}
+
+function getAcc(dates,gk){
+  const v=dates.map(d=>{const s=SESS_MAP[d.toISOString().slice(0,10)];return s&&s[gk]?Math.round(s[gk].h/s[gk].a*100):null;}).filter(x=>x!=null);
+  return v.length?arrAvg(v):null;
+}
+function getMins(dates){return dates.reduce((acc,d)=>{const s=SESS_MAP[d.toISOString().slice(0,10)];return acc+(s?s.mins:0);},0);}
+function getPain(dates){const v=dates.map(d=>{const s=SESS_MAP[d.toISOString().slice(0,10)];return s?s.pain:null;}).filter(x=>x!=null);return v.length?arrAvg(v):null;}
+
+function renderCharts(){
+  const filter=document.getElementById('gsel').value;
+  const data=getData();
+  const n=data.labels.length;
+  const pxPer=gran==='session'?18:gran==='week'?32:80;
+  const totalW=Math.max(660,n*pxPer);
+  ['w0','w1','w2'].forEach(id=>{document.getElementById(id).style.width=totalW+'px';});
+  const gKeys=Object.keys(GCONF).filter(k=>filter==='all'||filter===k);
+  const tickC='#999',gridC='rgba(0,0,0,0.06)',restC='rgba(0,0,0,0.03)';
+  const shX={ticks:{color:tickC,font:{size:10},maxRotation:gran==='session'?45:0,autoSkip:true,maxTicksLimit:14},grid:{color:gridC}};
+  charts.forEach(c=>{if(c)c.destroy();});
+  const accDS=gKeys.map(k=>{
+    const gk=GFIELD[k];
+    return{label:GCONF[k].label,
+      data:data.labels.map((l,i)=>{
+        const d=slotDates(data,i);
+        const wkN=Math.floor((d[0]-START)/86400000/7)+6;
+        if(wkN<GSTART[k])return null;
+        return getAcc(d,gk);
+      }),
+      borderColor:GCONF[k].color,backgroundColor:GCONF[k].color+'18',
+      borderWidth:1.5,borderDash:GCONF[k].dash,pointRadius:gran==='session'?1.5:4,
+      spanGaps:false,tension:0.3};
+  });
+  charts[0]=new Chart(document.getElementById('c0'),{type:'line',data:{labels:data.labels,datasets:accDS},
+    options:{responsive:false,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false}},
+      scales:{x:shX,y:{min:0,max:100,ticks:{color:tickC,font:{size:10},callback:v=>v+'%'},grid:{color:gridC}}}}});
+  charts[0].canvas.width=totalW;charts[0].canvas.height=300;charts[0].resize(totalW,300);
+  const minsV=data.labels.map((l,i)=>getMins(slotDates(data,i)));
+  charts[1]=new Chart(document.getElementById('c1'),{type:'bar',
+    data:{labels:data.labels,datasets:[{data:minsV,
+      backgroundColor:minsV.map(m=>m>=20?'#1D9E7599':m>=14?'#378ADD66':'#D4537E66'),
+      borderColor:minsV.map(m=>m>=20?'#1D9E75':m>=14?'#378ADD':'#D4537E'),
+      borderWidth:1,borderRadius:2}]},
+    options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{...shX,grid:{display:false}},y:{min:0,ticks:{color:tickC,font:{size:10}},grid:{color:gridC}}}}});
+  charts[1].canvas.width=totalW;charts[1].canvas.height=110;charts[1].resize(totalW,110);
+  const painV=data.labels.map((l,i)=>getPain(slotDates(data,i)));
+  charts[2]=new Chart(document.getElementById('c2'),{type:'bar',
+    data:{labels:data.labels,datasets:[{data:painV,
+      backgroundColor:painV.map(p=>p==null?restC:p>=7?'#E24B4A99':p>=5?'#EF9F2799':'#1D9E7599'),
+      borderColor:painV.map(p=>p==null?'transparent':p>=7?'#E24B4A':p>=5?'#BA7517':'#0F6E56'),
+      borderWidth:1,borderRadius:2}]},
+    options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{...shX,grid:{display:false}},y:{min:0,max:10,ticks:{color:tickC,font:{size:10}},grid:{color:gridC}}}}});
+  charts[2].canvas.width=totalW;charts[2].canvas.height=110;charts[2].resize(totalW,110);
+  document.getElementById('leg').innerHTML=gKeys.map(k=>{
+    const c=GCONF[k];const bi=c.dash.length?`repeating-linear-gradient(90deg,${c.color} 0,${c.color} 6px,transparent 6px,transparent 9px)`:'';
+    return`<span class="li"><span class="ld" style="background:${c.dash.length?'transparent':c.color};${bi?'background-image:'+bi:''}"></span>${c.label}</span>`;
+  }).join('');
+  const outers=['s0','s1','s2'].map(id=>document.getElementById(id));
+  outers.forEach(o=>{o.onscroll=()=>outers.forEach(x=>{if(x!==o)x.scrollLeft=o.scrollLeft;});});
+}
+
+renderCharts();
+</script>
+</body>
+</html>

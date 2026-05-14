@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignWave 04 — Speed Score + Gesture Quality + Annotations</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #f5f5f4; padding: 24px; color: #1a1916; }
+h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.meta { font-size: 12px; color: #888; margin-bottom: 16px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.seg { display: flex; border: 0.5px solid #ccc; border-radius: 6px; overflow: hidden; }
+.seg button { background: transparent; border: none; border-right: 0.5px solid #ccc; padding: 5px 12px; font-size: 12px; color: #666; cursor: pointer; }
+.seg button:last-child { border-right: none; }
+.seg button.act { background: #1a1916; color: #fff; }
+select { font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid #ccc; }
+.slabel { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing:.04em; margin-bottom: 4px; margin-top: 14px; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.li { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #555; }
+.ld { width: 12px; height: 3px; border-radius: 1px; }
+.scroll { overflow-x: auto; }
+.scroll::-webkit-scrollbar { height: 3px; }
+.scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+.chart-wrap { position: relative; }
+.annot-scroll { overflow-x: auto; }
+.annot-inner { position: relative; height: 28px; }
+.ann-chip { position: absolute; top: 3px; height: 22px; border-radius: 4px; display: flex; align-items: center; padding: 0 7px; font-size: 10px; font-weight: 600; white-space: nowrap; border: 0.5px solid; }
+.ann-chip.pain { background:#FCEBEB; color:#791F1F; border-color:#F09595; }
+.ann-chip.gap  { background:#FAEEDA; color:#633806; border-color:#EF9F27; }
+</style>
+</head>
+<body>
+<h1>SignWave Exploration 04</h1>
+<p class="meta">Added: gesture quality box plots (IQR + median + whiskers) and speed score with IQR band. Annotation lane. Five chart lanes total.</p>
+
+<div class="controls">
+  <div class="seg" id="viewSeg">
+    <button class="act" onclick="setGran('day',this)">Day</button>
+    <button onclick="setGran('week',this)">Week</button>
+    <button onclick="setGran('month',this)">Month</button>
+  </div>
+  <div class="seg" id="axisSeg">
+    <button class="act" onclick="setAxis('week',this)">W+0</button>
+    <button onclick="setAxis('cal',this)">Date</button>
+  </div>
+  <select id="gsel" onchange="render()">
+    <option value="all">All active</option>
+    <option value="extension">Extension</option>
+    <option value="hook">Hook</option>
+    <option value="tabletop">Tabletop</option>
+    <option value="closed">Closed Fist</option>
+    <option value="flat">Flat Fist</option>
+  </select>
+</div>
+
+<div class="slabel">Events</div>
+<div class="annot-scroll" id="annotScroll"><div class="annot-inner" id="annotInner"></div></div>
+<div class="slabel">Gesture accuracy (%)</div>
+<div class="legend" id="leg"></div>
+<div class="scroll" id="s0"><div class="chart-wrap" id="w0" style="height:240px;"><canvas id="c0"></canvas></div></div>
+<div class="slabel">Gesture quality — closeness to absolute form (box=IQR · line=median · whiskers=range)</div>
+<div class="scroll" id="s1"><div class="chart-wrap" id="w1" style="height:170px;"><canvas id="c1"></canvas></div></div>
+<div class="slabel">Speed score — normalized 0–100, higher=faster (band=IQR)</div>
+<div class="scroll" id="s2"><div class="chart-wrap" id="w2" style="height:140px;"><canvas id="c2"></canvas></div></div>
+<div class="slabel">Pain (0–10)</div>
+<div class="scroll" id="s3"><div class="chart-wrap" id="w3" style="height:90px;"><canvas id="c3"></canvas></div></div>
+<div class="slabel">Minutes played</div>
+<div class="scroll" id="s4"><div class="chart-wrap" id="w4" style="height:90px;"><canvas id="c4"></canvas></div></div>
+
+<script>
+const START=new Date(2024,0,8);const TOTAL_DAYS=21*7;
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+function fmtW(d){const diff=Math.round((d-START)/86400000);return`W${Math.floor(diff/7)+6}·D${diff%7+1}`;}
+function fmtCal(d){return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+const GCONF={extension:{label:'Extension',color:'#378ADD',dash:[]},hook:{label:'Hook',color:'#D4537E',dash:[6,3]},tabletop:{label:'Tabletop',color:'#1D9E75',dash:[2,2]},closed:{label:'Closed Fist',color:'#BA7517',dash:[8,2,2,2]},flat:{label:'Flat Fist',color:'#7F77DD',dash:[4,2]}};
+const GFIELD={extension:'ext',hook:'hk',tabletop:'tb',closed:'cf',flat:'ff'};
+const GSTART={extension:6,hook:6,tabletop:8,closed:12,flat:22};
+const SESS_RAW=[
+  {wk:6,dy:1,pain:7,mins:8,ext:{h:6,a:20},hk:{h:5,a:20},tb:null,cf:null,ff:null},
+  {wk:6,dy:3,pain:6,mins:10,ext:{h:8,a:20},hk:{h:7,a:20},tb:null,cf:null,ff:null},
+  {wk:8,dy:1,pain:6,mins:13,ext:{h:10,a:20},hk:{h:10,a:20},tb:{h:5,a:20},cf:null,ff:null},
+  {wk:9,dy:2,pain:8,mins:10,ext:{h:9,a:20},hk:{h:8,a:20},tb:{h:5,a:20},cf:null,ff:null},
+  {wk:12,dy:1,pain:4,mins:17,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:12,a:20},cf:{h:5,a:20},ff:null},
+  {wk:17,dy:1,pain:6,mins:11,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:12,a:20},cf:{h:8,a:20},ff:null},
+  {wk:22,dy:1,pain:2,mins:23,ext:{h:19,a:20},hk:{h:18,a:20},tb:{h:18,a:20},cf:{h:16,a:20},ff:{h:5,a:20}},
+  {wk:26,dy:5,pain:1,mins:27,ext:{h:20,a:20},hk:{h:20,a:20},tb:{h:20,a:20},cf:{h:20,a:20},ff:{h:17,a:20}},
+];
+function sessDate(s){return addDays(START,(s.wk-6)*7+(s.dy-1));}
+const SESS_MAP={};SESS_RAW.forEach((s,si)=>{SESS_MAP[sessDate(s).toISOString().slice(0,10)]={...s,si};});
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+function qualityStats(si,gk,pain){const prog=Math.min(1,si/7),pp=pain>=7?0.15:0;const bases={ff:.20,cf:.25,tb:.28,hk:.30,ext:.32};const gains={ff:.55,cf:.58,tb:.55,hk:.52,ext:.50};const bm=Math.max(.12,(bases[gk]||.3)+prog*(gains[gk]||.5)-pp);const spr=Math.max(.05,.22-prog*.14+pp*.5);return{med:Math.round(bm*100),q1:Math.round(clamp(bm-spr*.7,0,1)*100),q3:Math.round(clamp(bm+spr*.5,0,1)*100),wMin:Math.round(clamp(bm-spr*1.3,0,1)*100),wMax:Math.round(clamp(bm+spr*.9,0,1)*100)};}
+function speedStats(si,gk,pain,acc){const prog=Math.min(1,si/7),pp=pain>=7?18:0;const bases={ff:15,cf:18,tb:20,hk:22,ext:25};const gains={ff:52,cf:54,tb:52,hk:50,ext:48};const bm=clamp((bases[gk]||20)+prog*(gains[gk]||50)-pp+(acc-50)*.15,5,95);const spr=Math.max(4,28-prog*18+pp*.4);return{med:Math.round(bm),q1:Math.max(2,Math.round(bm-spr*.7)),q3:Math.min(98,Math.round(bm+spr*.5))};}
+
+let gran='day',axisMode='week';let charts=[null,null,null,null,null];let pendingBox=null;
+function setGran(g,btn){gran=g;document.querySelectorAll('#viewSeg button').forEach(b=>b.classList.remove('act'));btn.classList.add('act');render();}
+function setAxis(m,btn){axisMode=m;document.querySelectorAll('#axisSeg button').forEach(b=>b.classList.remove('act'));btn.classList.add('act');render();}
+function labelFor(d){return axisMode==='cal'?fmtCal(d):fmtW(d);}
+function allDates(){const a=[];for(let i=0;i<TOTAL_DAYS;i++)a.push(addDays(START,i));return a;}
+function weekGroups(){const g={};for(let w=6;w<=26;w++){g[`W${w}`]=[];for(let d=1;d<=7;d++){const off=(w-6)*7+(d-1);if(off<TOTAL_DAYS)g[`W${w}`].push(addDays(START,off));}}return g;}
+function monthGroups(){const g={};allDates().forEach(d=>{const k=d.toLocaleDateString('en-US',{month:'short',year:'numeric'});if(!g[k])g[k]=[];g[k].push(d);});return g;}
+function getSlots(){if(gran==='day'){const dates=allDates();return{labels:dates.map(d=>labelFor(d)),dates,groups:null,keys:null};}if(gran==='week'){const g=weekGroups();const k=Object.keys(g);const fd=k.map(kk=>g[kk][0]);return{labels:axisMode==='cal'?fd.map(d=>fmtCal(d)):k,dates:fd,groups:g,keys:k};}const g=monthGroups();const k=Object.keys(g);const fd=k.map(kk=>g[kk][0]);return{labels:k,dates:fd,groups:g,keys:k};}
+function slotDates(slots,i){if(gran==='day')return[slots.dates[i]];return slots.groups[slots.keys[i]];}
+function prepCanvas(id,w,h){const c=document.getElementById(id);c.width=w;c.height=h;c.style.width=w+'px';c.style.height=h+'px';}
+function drawBoxes(chart,boxRows,gKeys){const ctx=chart.ctx;const{left,right}=chart.chartArea;const yScale=chart.scales.y;const n=boxRows[0]?boxRows[0].length:1;const slotW=(right-left)/n;const gCount=gKeys.length;const bw=Math.max(2,Math.min(9,slotW/gCount-2));gKeys.forEach((k,gi)=>{const color=GCONF[k].color;(boxRows[gi]||[]).forEach((box,i)=>{if(!box)return;const cx=left+(i+.5)*slotW+(gi-(gCount-1)/2)*(bw+2);const yMed=yScale.getPixelForValue(box.med),yQ1=yScale.getPixelForValue(box.q1),yQ3=yScale.getPixelForValue(box.q3),yWMin=yScale.getPixelForValue(box.wMin),yWMax=yScale.getPixelForValue(box.wMax);ctx.save();ctx.fillStyle=color+'50';ctx.strokeStyle=color;ctx.lineWidth=.8;ctx.fillRect(cx-bw/2,yQ3,bw,yQ1-yQ3);ctx.strokeRect(cx-bw/2,yQ3,bw,yQ1-yQ3);ctx.beginPath();ctx.moveTo(cx-bw/2,yMed);ctx.lineTo(cx+bw/2,yMed);ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();ctx.lineWidth=.8;ctx.strokeStyle=color+'99';[[yQ1,yWMin],[yQ3,yWMax]].forEach(([a,b])=>{ctx.beginPath();ctx.moveTo(cx,a);ctx.lineTo(cx,b);ctx.stroke();});[yWMin,yWMax].forEach(y=>{ctx.beginPath();ctx.moveTo(cx-bw/3,y);ctx.lineTo(cx+bw/3,y);ctx.stroke();});ctx.restore();});});}
+
+function buildAnnot(slots,totalW){const inner=document.getElementById('annotInner');inner.style.width=totalW+'px';inner.innerHTML='';if(gran!=='day')return;let prevPain=null,lastIdx=null;slots.dates.forEach((d,i)=>{const s=SESS_MAP[d.toISOString().slice(0,10)];if(s){if(prevPain!=null&&s.pain-prevPain>=3){const chip=document.createElement('div');chip.className='ann-chip pain';chip.style.left=Math.round(i/slots.dates.length*totalW)+'px';chip.textContent=`Pain +${s.pain-prevPain}`;inner.appendChild(chip);}if(lastIdx!=null&&i-lastIdx>3){const chip=document.createElement('div');chip.className='ann-chip gap';chip.style.left=Math.round((lastIdx+1)/slots.dates.length*totalW)+'px';chip.textContent=`${i-lastIdx-1}-day gap`;inner.appendChild(chip);}prevPain=s.pain;lastIdx=i;}});}
+
+function render(){
+  const filter=document.getElementById('gsel').value;const slots=getSlots();const n=slots.labels.length;
+  const pxPer=gran==='day'?18:gran==='week'?32:80;const totalW=Math.max(660,n*pxPer);
+  const gKeys=Object.keys(GCONF).filter(k=>filter==='all'||filter===k);
+  const tickC='#999',gridC='rgba(0,0,0,0.06)',restC='rgba(0,0,0,0.03)';
+  ['w0','w1','w2','w3','w4'].forEach(id=>{document.getElementById(id).style.width=totalW+'px';});
+  charts.forEach(c=>{if(c)c.destroy();});if(pendingBox){clearTimeout(pendingBox);pendingBox=null;}
+  const shX={ticks:{color:tickC,font:{size:10},maxRotation:gran==='day'?50:0,autoSkip:true,maxTicksLimit:28},grid:{color:gridC}};
+  const accDS=gKeys.map(k=>{const gk=GFIELD[k];return{label:GCONF[k].label,data:slots.labels.map((l,i)=>{const d=slotDates(slots,i);const wkN=Math.floor((d[0]-START)/86400000/7)+6;if(wkN<GSTART[k])return null;const v=d.map(dd=>{const s=SESS_MAP[dd.toISOString().slice(0,10)];return s&&s[gk]?Math.round(s[gk].h/s[gk].a*100):null;}).filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;}),borderColor:GCONF[k].color,backgroundColor:GCONF[k].color+'18',borderWidth:1.5,borderDash:GCONF[k].dash,pointRadius:gran==='day'?1.5:4,spanGaps:false,tension:0.35};});
+  prepCanvas('c0',totalW,240);charts[0]=new Chart(document.getElementById('c0'),{type:'line',data:{labels:slots.labels,datasets:accDS},options:{responsive:false,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false}},scales:{x:shX,y:{min:0,max:100,ticks:{color:tickC,font:{size:10},callback:v=>v+'%'},grid:{color:gridC}}}}});
+  const boxRows=gKeys.map(k=>{const gk=GFIELD[k];return slots.labels.map((l,i)=>{const d=slotDates(slots,i);const wkN=Math.floor((d[0]-START)/86400000/7)+6;if(wkN<GSTART[k])return null;const sess=d.map(dd=>SESS_MAP[dd.toISOString().slice(0,10)]).filter(s=>s&&s[gk]);if(!sess.length)return null;const stats=sess.map(s=>qualityStats(s.si,gk,s.pain));if(stats.length===1)return stats[0];const avg=a=>Math.round(a.reduce((x,y)=>x+y,0)/a.length);return{med:avg(stats.map(s=>s.med)),q1:avg(stats.map(s=>s.q1)),q3:avg(stats.map(s=>s.q3)),wMin:Math.min(...stats.map(s=>s.wMin)),wMax:Math.max(...stats.map(s=>s.wMax))};});});
+  prepCanvas('c1',totalW,170);const c1=new Chart(document.getElementById('c1'),{type:'line',data:{labels:slots.labels,datasets:[{label:'_',data:slots.labels.map(()=>null),borderColor:'transparent',pointRadius:0}]},options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:items=>slots.labels[items[0].dataIndex],label:()=>null,afterBody:items=>{const i=items[0].dataIndex;return gKeys.map((k,gi)=>{const b=boxRows[gi]&&boxRows[gi][i];return b?`${GCONF[k].label}: med ${b.med}% · IQR ${b.q1}–${b.q3}%`:null;}).filter(Boolean);}}}},scales:{x:shX,y:{min:0,max:100,ticks:{color:tickC,font:{size:10},callback:v=>v+'%'},grid:{color:gridC}}}}});charts[1]=c1;pendingBox=setTimeout(()=>{c1.draw();drawBoxes(c1,boxRows,gKeys);},80);
+  const speedDS=gKeys.flatMap(k=>{const gk=GFIELD[k];const meds=[],q1s=[],q3s=[];slots.labels.forEach((l,i)=>{const d=slotDates(slots,i);const wkN=Math.floor((d[0]-START)/86400000/7)+6;if(wkN<GSTART[k]){meds.push(null);q1s.push(null);q3s.push(null);return;}const sess=d.map(dd=>SESS_MAP[dd.toISOString().slice(0,10)]).filter(s=>s&&s[gk]);if(!sess.length){meds.push(null);q1s.push(null);q3s.push(null);return;}const stats=sess.map(s=>speedStats(s.si,gk,s.pain,Math.round(s[gk].h/s[gk].a*100)));const avg=a=>Math.round(a.reduce((x,y)=>x+y,0)/a.length);meds.push(avg(stats.map(s=>s.med)));q1s.push(avg(stats.map(s=>s.q1)));q3s.push(avg(stats.map(s=>s.q3)));});return[{label:GCONF[k].label,data:meds,borderColor:GCONF[k].color,backgroundColor:'transparent',borderWidth:1.5,borderDash:GCONF[k].dash,pointRadius:gran==='day'?1.5:3,spanGaps:false,tension:0.3,order:1},{label:`_q1_${k}`,data:q1s,borderColor:'transparent',backgroundColor:GCONF[k].color+'28',fill:'+1',pointRadius:0,spanGaps:false,tension:0.3,order:2},{label:`_q3_${k}`,data:q3s,borderColor:'transparent',backgroundColor:'transparent',fill:false,pointRadius:0,spanGaps:false,tension:0.3,order:2}];});
+  prepCanvas('c2',totalW,140);charts[2]=new Chart(document.getElementById('c2'),{type:'line',data:{labels:slots.labels,datasets:speedDS},options:{responsive:false,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{filter:i=>!i.dataset.label.startsWith('_')}},scales:{x:shX,y:{min:0,max:100,ticks:{color:tickC,font:{size:10}},grid:{color:gridC}}}}});
+  const painVals=slots.labels.map((l,i)=>{const v=slotDates(slots,i).map(d=>{const s=SESS_MAP[d.toISOString().slice(0,10)];return s?s.pain:null;}).filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;});
+  prepCanvas('c3',totalW,90);charts[3]=new Chart(document.getElementById('c3'),{type:'bar',data:{labels:slots.labels,datasets:[{data:painVals,backgroundColor:painVals.map(p=>p==null?restC:p>=7?'#E24B4A99':p>=5?'#EF9F2799':'#1D9E7599'),borderColor:painVals.map(p=>p==null?'transparent':p>=7?'#E24B4A':p>=5?'#BA7517':'#0F6E56'),borderWidth:1,borderRadius:2}]},options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{...shX,grid:{display:false}},y:{min:0,max:10,ticks:{color:tickC,font:{size:10}},grid:{color:gridC}}}}});
+  const minsVals=slots.labels.map((l,i)=>slotDates(slots,i).reduce((acc,d)=>{const s=SESS_MAP[d.toISOString().slice(0,10)];return acc+(s?s.mins:0);},0));
+  const isSess=slots.labels.map((l,i)=>slotDates(slots,i).some(d=>!!SESS_MAP[d.toISOString().slice(0,10)]));
+  prepCanvas('c4',totalW,90);charts[4]=new Chart(document.getElementById('c4'),{type:'bar',data:{labels:slots.labels,datasets:[{data:minsVals,backgroundColor:minsVals.map((m,i)=>!isSess[i]&&gran==='day'?restC:m>=20?'#1D9E7599':m>=14?'#378ADD66':'#D4537E66'),borderColor:minsVals.map((m,i)=>!isSess[i]&&gran==='day'?'transparent':m>=20?'#1D9E75':m>=14?'#378ADD':'#D4537E'),borderWidth:1,borderRadius:2}]},options:{responsive:false,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{...shX,grid:{display:false}},y:{min:0,ticks:{color:tickC,font:{size:10}},grid:{color:gridC}}}}});
+  buildAnnot(slots,totalW);
+  document.getElementById('leg').innerHTML=gKeys.map(k=>{const c=GCONF[k];const bi=c.dash.length?`repeating-linear-gradient(90deg,${c.color} 0,${c.color} 6px,transparent 6px,transparent 9px)`:'';return`<span class="li"><span class="ld" style="background:${c.dash.length?'transparent':c.color};${bi?'background-image:'+bi:''}"></span>${c.label}</span>`;}).join('');
+  const scrollers=['annotScroll','s0','s1','s2','s3','s4'].map(id=>document.getElementById(id));scrollers.forEach(o=>{o.onscroll=()=>scrollers.forEach(x=>{if(x!==o)x.scrollLeft=o.scrollLeft;});});
+}
+render();
+</script>
+</body>
+</html>

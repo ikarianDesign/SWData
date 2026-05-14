@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignWave 01 — Accuracy + Pain, first prototype</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #f5f5f4; padding: 24px; color: #1a1916; }
+h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.meta { font-size: 12px; color: #888; margin-bottom: 20px; }
+.card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+.slabel { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #888; margin-bottom: 8px; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.li { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #555; }
+.ld { width: 10px; height: 3px; border-radius: 1px; }
+.chart-wrap { position: relative; }
+</style>
+</head>
+<body>
+<h1>SignWave Exploration 01</h1>
+<p class="meta">First prototype — gesture accuracy hit-rate per session + self-reported pain. Tyler M., weeks 6–26 post cast removal. Chart.js line + bar.</p>
+
+<div class="card">
+  <div class="slabel">Gesture accuracy per session (%)</div>
+  <div class="legend" id="leg"></div>
+  <div class="chart-wrap" style="height:300px;"><canvas id="c0"></canvas></div>
+</div>
+<div class="card">
+  <div class="slabel">Self-reported pain (0–10)</div>
+  <div class="chart-wrap" style="height:140px;"><canvas id="c1"></canvas></div>
+</div>
+
+<script>
+const GCONF = {
+  extension:{ label:'Extension',   color:'#378ADD', dash:[] },
+  hook:     { label:'Hook',        color:'#D4537E', dash:[6,3] },
+  tabletop: { label:'Tabletop',    color:'#1D9E75', dash:[2,2] },
+  closed:   { label:'Closed Fist', color:'#BA7517', dash:[8,2,2,2] },
+  flat:     { label:'Flat Fist',   color:'#7F77DD', dash:[4,2] },
+};
+const GSTART = { extension:0, hook:0, tabletop:5, closed:13, flat:32 };
+
+const S = [
+  {w:6,d:1,pain:7,ext:{h:6,a:20},hk:{h:5,a:20},tb:null,cf:null,ff:null},
+  {w:6,d:3,pain:6,ext:{h:8,a:20},hk:{h:7,a:20},tb:null,cf:null,ff:null},
+  {w:6,d:5,pain:7,ext:{h:9,a:20},hk:{h:8,a:20},tb:null,cf:null,ff:null},
+  {w:7,d:1,pain:6,ext:{h:10,a:20},hk:{h:9,a:20},tb:null,cf:null,ff:null},
+  {w:7,d:4,pain:5,ext:{h:11,a:20},hk:{h:10,a:20},tb:null,cf:null,ff:null},
+  {w:8,d:1,pain:6,ext:{h:10,a:20},hk:{h:10,a:20},tb:{h:5,a:20},cf:null,ff:null},
+  {w:8,d:3,pain:5,ext:{h:11,a:20},hk:{h:11,a:20},tb:{h:6,a:20},cf:null,ff:null},
+  {w:8,d:6,pain:6,ext:{h:12,a:20},hk:{h:10,a:20},tb:{h:7,a:20},cf:null,ff:null},
+  {w:9,d:2,pain:8,ext:{h:9,a:20},hk:{h:8,a:20},tb:{h:5,a:20},cf:null,ff:null},
+  {w:10,d:1,pain:6,ext:{h:11,a:20},hk:{h:10,a:20},tb:{h:8,a:20},cf:null,ff:null},
+  {w:10,d:4,pain:5,ext:{h:12,a:20},hk:{h:11,a:20},tb:{h:9,a:20},cf:null,ff:null},
+  {w:11,d:2,pain:4,ext:{h:13,a:20},hk:{h:12,a:20},tb:{h:10,a:20},cf:null,ff:null},
+  {w:11,d:5,pain:4,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:11,a:20},cf:null,ff:null},
+  {w:12,d:1,pain:4,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:12,a:20},cf:{h:5,a:20},ff:null},
+  {w:12,d:4,pain:4,ext:{h:15,a:20},hk:{h:14,a:20},tb:{h:12,a:20},cf:{h:6,a:20},ff:null},
+  {w:15,d:5,pain:2,ext:{h:18,a:20},hk:{h:17,a:20},tb:{h:16,a:20},cf:{h:12,a:20},ff:null},
+  {w:17,d:1,pain:6,ext:{h:14,a:20},hk:{h:13,a:20},tb:{h:12,a:20},cf:{h:8,a:20},ff:null},
+  {w:22,d:1,pain:2,ext:{h:19,a:20},hk:{h:18,a:20},tb:{h:18,a:20},cf:{h:16,a:20},ff:{h:5,a:20}},
+  {w:25,d:5,pain:1,ext:{h:20,a:20},hk:{h:20,a:20},tb:{h:20,a:20},cf:{h:19,a:20},ff:{h:15,a:20}},
+  {w:26,d:5,pain:1,ext:{h:20,a:20},hk:{h:20,a:20},tb:{h:20,a:20},cf:{h:20,a:20},ff:{h:17,a:20}},
+];
+const FIELDS = {extension:'ext',hook:'hk',tabletop:'tb',closed:'cf',flat:'ff'};
+const labels = S.map(s=>`W${s.w}D${s.d}`);
+const pct = (h,a)=>Math.round(h/a*100);
+const tickC='#999', gridC='rgba(0,0,0,0.06)';
+
+document.getElementById('leg').innerHTML = Object.entries(GCONF).map(([k,g])=>
+  `<span class="li"><span class="ld" style="background:${g.color};"></span>${g.label}</span>`).join('');
+
+new Chart(document.getElementById('c0'),{
+  type:'line',
+  data:{labels,datasets:Object.entries(GCONF).map(([k,g],gi)=>({
+    label:g.label,
+    data:S.map((s,i)=>{
+      if(i<GSTART[k])return null;
+      const f=FIELDS[k]; return s[f]?pct(s[f].h,s[f].a):null;
+    }),
+    borderColor:g.color,backgroundColor:g.color+'18',
+    borderWidth:2,borderDash:g.dash,pointRadius:3,spanGaps:false,tension:0.3,
+  }))},
+  options:{responsive:true,maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:tickC,font:{size:10}},grid:{color:gridC}},
+            y:{min:0,max:100,ticks:{color:tickC,font:{size:10},callback:v=>v+'%'},grid:{color:gridC}}}}
+});
+
+const painVals = S.map(s=>s.pain);
+new Chart(document.getElementById('c1'),{
+  type:'bar',
+  data:{labels,datasets:[{label:'Pain',data:painVals,
+    backgroundColor:painVals.map(p=>p>=7?'#E24B4A99':p>=5?'#EF9F2799':'#1D9E7599'),
+    borderColor:painVals.map(p=>p>=7?'#E24B4A':p>=5?'#BA7517':'#0F6E56'),
+    borderWidth:1,borderRadius:3}]},
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:tickC,font:{size:10}},grid:{display:false}},
+            y:{min:0,max:10,ticks:{color:tickC,font:{size:10}},grid:{color:gridC}}}}
+});
+</script>
+</body>
+</html>
