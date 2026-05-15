@@ -64,26 +64,31 @@ button { font-family: var(--font); cursor: pointer; }
   background: var(--surface);
   border-bottom: 0.5px solid var(--border);
   padding: 10px 28px;
-  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  display: flex; align-items: center; justify-content: space-between;
   position: sticky; top: 0; z-index: 100;
 }
-.toolbar-group { display: flex; gap: 6px; align-items: center; }
-.toolbar-group label { font-size: 12px; color: var(--text-sec); }
 .spacer { flex: 1; }
-.seg {
-  display: flex;
-  border: 0.5px solid var(--border-md);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
+.nav-controls { display: flex; align-items: center; gap: 12px; }
+.nav-controls button {
+  background: none; border: 0.5px solid var(--border-md);
+  padding: 5px 11px; cursor: pointer; border-radius: var(--radius-sm);
+  font-size: 16px; color: var(--text-pri); line-height: 1;
+  transition: background .12s;
 }
+.nav-controls button:hover { background: var(--surface2); }
+.nav-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
+#dateRangeLabel {
+  font-size: 13px; min-width: 150px; text-align: center; color: var(--text-sec);
+}
+.seg { display: flex; gap: 6px; }
 .seg button {
-  background: transparent; border: none;
-  border-right: 0.5px solid var(--border-md);
-  padding: 5px 12px; font-size: 12px; color: var(--text-sec);
-  transition: background .12s, color .12s;
+  background: var(--surface); border: 0.5px solid var(--border-md);
+  border-radius: var(--radius-sm); padding: 5px 14px;
+  font-size: 12px; color: var(--text-sec); cursor: pointer;
+  transition: all .12s;
 }
-.seg button:last-child { border-right: none; }
-.seg button.act { background: var(--text-pri); color: #fff; }
+.seg button:hover { border-color: var(--text-pri); }
+.seg button.active { background: var(--text-pri); color: #fff; border-color: var(--text-pri); }
 select {
   font-family: var(--font); font-size: 12px;
   padding: 5px 10px; border-radius: var(--radius-sm);
@@ -242,38 +247,14 @@ select {
 
 <!-- TOOLBAR -->
 <div class="toolbar">
-  <div class="toolbar-group">
-    <div class="seg" id="viewSeg">
-      <button onclick="setView('week',this)">Week</button>
-      <button onclick="setView('month',this)">Month</button>
-      <button class="act" onclick="setView('all',this)">All</button>
-    </div>
-  </div>
-  <div class="toolbar-group">
-    <div class="seg" id="axisSeg">
-      <button class="act" onclick="setAxis('week',this)">W+0</button>
-      <button onclick="setAxis('cal',this)">Date</button>
-    </div>
-  </div>
-  <div class="toolbar-group">
-    <label for="gsel">Gestures</label>
-    <select id="gsel" onchange="render()">
-      <option value="all">All active</option>
-      <option value="extension">Extension</option>
-      <option value="hook">Hook</option>
-      <option value="tabletop">Tabletop</option>
-      <option value="closed">Closed Fist</option>
-      <option value="flat">Flat Fist</option>
-    </select>
+  <div class="nav-controls">
+    <button id="btnPrev" onclick="stepWindow(-1)">‹</button>
+    <span id="dateRangeLabel">—</span>
+    <button id="btnNext" onclick="stepWindow(1)">›</button>
   </div>
   <div class="spacer"></div>
-  <div class="vis-toggle-group">
-    <span class="vtlabel">Lanes</span>
-    <span class="lane-pill on" data-lane="laneEvents"   onclick="toggleLane(this)"><span class="dot"></span>Events</span>
-    <span class="lane-pill on" data-lane="laneAccuracy" onclick="toggleLane(this)"><span class="dot"></span>Accuracy</span>
-    <span class="lane-pill on" data-lane="laneSpeed"    onclick="toggleLane(this)"><span class="dot"></span>Speed</span>
-    <span class="lane-pill on" data-lane="lanePain"     onclick="toggleLane(this)"><span class="dot"></span>Pain</span>
-    <span class="lane-pill on" data-lane="laneMinutes"  onclick="toggleLane(this)"><span class="dot"></span>Minutes</span>
+  <div class="seg" id="zoomSeg">
+    <!-- populated dynamically -->
   </div>
 </div>
 
@@ -539,63 +520,130 @@ function painStats(sessions) {
   return { median, min: values[0], max: values[n-1], q1, q3 };
 }
 
-function setView(m,btn){
-  viewMode=m;
-  document.querySelectorAll('#viewSeg button').forEach(b=>b.classList.remove('act'));
-  btn.classList.add('act');
-  render();
-}
-function setAxis(m,btn){
-  axisMode=m;
-  document.querySelectorAll('#axisSeg button').forEach(b=>b.classList.remove('act'));
-  btn.classList.add('act');
-  render();
-}
 function collapseLane(id){document.getElementById(id).classList.toggle('collapsed');}
-function toggleLane(pill){
-  const lane=document.getElementById(pill.dataset.lane);
-  pill.classList.toggle('on');
-  lane.style.display=pill.classList.contains('on')?'':'none';
+
+function renderZoomButtons(availableZooms) {
+  const segEl = document.getElementById('zoomSeg');
+  segEl.innerHTML = '';
+  const labels = { '1mo':'1 mo', '3mo':'3 mo', '6mo':'6 mo', '1yr':'1 yr' };
+  availableZooms.forEach(zoom => {
+    const btn = document.createElement('button');
+    btn.textContent = labels[zoom];
+    btn.onclick = () => setZoom(zoom);
+    segEl.appendChild(btn);
+  });
+}
+
+function setActiveZoomButton(zoom) {
+  const labels = { '1mo':'1 mo', '3mo':'3 mo', '6mo':'6 mo', '1yr':'1 yr' };
+  document.querySelectorAll('#zoomSeg button').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === labels[zoom]);
+  });
+}
+
+function setZoom(newZoom) {
+  zoomLevel = newZoom;
+  setActiveZoomButton(zoomLevel);
+  draw();
+}
+
+function stepWindow(direction) {
+  const stepSizes = { '1mo':7, '3mo':28, '6mo':84, '1yr':168 };
+  const step = stepSizes[zoomLevel];
+  const lastDate = sessDate(SESS_RAW[SESS_RAW.length - 1]);
+  if (direction > 0) {
+    windowEnd = addDays(windowEnd, step);
+    if (windowEnd > lastDate) windowEnd = new Date(lastDate);
+  } else {
+    windowEnd = addDays(windowEnd, -step);
+    const ws = deriveWindowStart(windowEnd, zoomLevel);
+    if (ws < START) {
+      const dur = { '1mo':28, '3mo':84, '6mo':168, '1yr':365 }[zoomLevel];
+      windowEnd = addDays(START, dur - 1);
+    }
+  }
+  draw();
+}
+
+function updateDateRangeLabel(start, end) {
+  const fmt = { month:'short', day:'numeric' };
+  let s = start.toLocaleDateString('en-US', fmt);
+  let e = end.toLocaleDateString('en-US', fmt);
+  if (start.getFullYear() !== end.getFullYear()) {
+    s = start.toLocaleDateString('en-US', { ...fmt, year:'numeric' });
+    e = end.toLocaleDateString('en-US', { ...fmt, year:'numeric' });
+  }
+  document.getElementById('dateRangeLabel').textContent = `${s} – ${e}`;
+}
+
+function updateArrowVisibility(start, end) {
+  const lastDate = sessDate(SESS_RAW[SESS_RAW.length - 1]);
+  document.getElementById('btnPrev').disabled = (start.getTime() === START.getTime());
+  document.getElementById('btnNext').disabled = (end.getTime() === lastDate.getTime());
 }
 
 /* ============================================================
    SLOT BUILDING
    ============================================================ */
-function buildSlots(){
-  if(viewMode==='all'){
-    const buckets=weekBuckets();
-    return{
-      labels:buckets.map(b=>axisMode==='cal'?fmtCal(b.date):b.label),
-      dates:buckets.map(b=>b.date),
-      slotDays:buckets.map(b=>b.days),
-      isWeekly:true,
-      totalCols:buckets.length,
-    };
+function buildSlots(start, end, zoom) {
+  const slots = [];
+  if (zoom === '1mo' || zoom === '3mo') {
+    let d = new Date(start);
+    while (d <= end) {
+      const key = d.toISOString().slice(0, 10);
+      const sess = SESS_MAP[key] || null;
+      slots.push({ date: new Date(d), sessions: sess ? [sess] : [], type: 'day' });
+      d = addDays(d, 1);
+    }
+  } else if (zoom === '6mo') {
+    let d = new Date(start);
+    const grouped = {};
+    while (d <= end) {
+      const sunday = new Date(d);
+      sunday.setDate(d.getDate() - d.getDay());
+      const weekKey = sunday.toISOString().slice(0, 10);
+      if (!grouped[weekKey]) {
+        grouped[weekKey] = { date: new Date(sunday), sessions: [], type: 'week', minutes: 0, accuracy: {}, pain: null };
+      }
+      const sess = SESS_MAP[d.toISOString().slice(0, 10)] || null;
+      if (sess) { grouped[weekKey].sessions.push(sess); grouped[weekKey].minutes += sess.mins || 0; }
+      d = addDays(d, 1);
+    }
+    Object.values(grouped).forEach(week => {
+      if (week.sessions.length > 0) week.pain = painStats(week.sessions);
+      slots.push(week);
+    });
+  } else if (zoom === '1yr') {
+    let d = new Date(start);
+    d.setDate(1);
+    const grouped = {};
+    while (d <= end) {
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      if (!grouped[monthKey]) {
+        grouped[monthKey] = { date: new Date(d.getFullYear(), d.getMonth(), 1), sessions: [], type: 'month', minutes: 0, accuracy: {}, pain: null };
+      }
+      const sess = SESS_MAP[d.toISOString().slice(0, 10)] || null;
+      if (sess) { grouped[monthKey].sessions.push(sess); grouped[monthKey].minutes += sess.mins || 0; }
+      d = addDays(d, 1);
+    }
+    Object.values(grouped).forEach(month => {
+      if (month.sessions.length > 0) month.pain = painStats(month.sessions);
+      slots.push(month);
+    });
   }
-  const days=allDates();
-  return{
-    labels:days.map(d=>axisMode==='cal'?fmtCal(d):fmtWeek(d)),
-    dates:days,
-    slotDays:days.map(d=>[d]),
-    isWeekly:false,
-    totalCols:days.length,
-  };
+  return slots;
 }
 
-function getContainerW(){
-  const el=document.getElementById('s0');
-  return el?el.clientWidth||700:700;
-}
-
-function getGeometry(totalCols){
-  const cw=getContainerW();
-  if(viewMode==='all')return{pxPer:cw/totalCols,totalW:cw};
-  if(viewMode==='month'){const p=cw/28;return{pxPer:p,totalW:Math.round(p*totalCols)};}
-  const p=cw/7;return{pxPer:p,totalW:Math.round(p*totalCols)};
+function draw() {
+  windowStart = deriveWindowStart(windowEnd, zoomLevel);
+  if (windowStart < START) windowStart = new Date(START);
+  const slots = buildSlots(windowStart, windowEnd, zoomLevel);
+  updateDateRangeLabel(windowStart, windowEnd);
+  updateArrowVisibility(windowStart, windowEnd);
+  render(slots);
 }
 
 function snapToRecent(){
-  if(viewMode==='all')return;
   ['annotScroll','s0','s2','s3','s4'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.scrollLeft=el.scrollWidth;
@@ -605,89 +653,99 @@ function snapToRecent(){
 /* ============================================================
    ANNOTATIONS
    ============================================================ */
-function detectEvents(slots){
-  if(slots.isWeekly){
-    const events=[];
-    let prevPain=null;
-    SESS_RAW.forEach((s,si)=>{
-      if(prevPain!=null&&s.pain-prevPain>=3){
-        const sd=sessDate(s);
-        const idx=slots.dates.findIndex(d=>Math.abs(d-sd)<86400000*3.5);
-        if(idx>=0)events.push({startIdx:idx,type:'pain',label:`Pain +${s.pain-prevPain}`});
-      }
-      if(si>0){
-        const gap=Math.round((sessDate(s)-sessDate(SESS_RAW[si-1]))/86400000)-1;
-        if(gap>=3){
-          const idx=slots.dates.findIndex(d=>Math.abs(d-sessDate(SESS_RAW[si-1]))<86400000*3.5);
-          if(idx>=0&&idx+1<slots.totalCols)events.push({startIdx:idx+1,type:'gap',label:`${gap}-day gap`});
-        }
-      }
-      prevPain=s.pain;
-    });
-    return events;
-  }
-  const events=[];
-  let prevPain=null,lastIdx=null;
-  slots.dates.forEach((d,i)=>{
-    const s=SESS_MAP[d.toISOString().slice(0,10)];
-    if(s){
-      if(prevPain!=null&&s.pain-prevPain>=3)
-        events.push({startIdx:i,type:'pain',label:`Pain +${s.pain-prevPain} (${prevPain}→${s.pain})`});
-      if(lastIdx!=null&&i-lastIdx>3){
-        const g=i-lastIdx-1;
-        events.push({startIdx:lastIdx+1,type:'gap',label:`${g}-day gap`});
-      }
-      prevPain=s.pain;lastIdx=i;
+function buildAnnotFromSlots(slots, totalW) {
+  const inner = document.getElementById('annotInner');
+  inner.style.width = totalW + 'px';
+  inner.innerHTML = '';
+  if (zoomLevel !== '1mo' && zoomLevel !== '3mo') return;
+  const slotW = totalW / slots.length;
+  let prevPain = null, lastSessIdx = null;
+  slots.forEach((slot, i) => {
+    const sess = slot.sessions[0];
+    if (!sess) return;
+    if (prevPain != null && sess.pain - prevPain >= 3) {
+      const chip = document.createElement('div');
+      chip.className = 'ann-chip pain';
+      chip.style.left = Math.round(i * slotW) + 'px';
+      chip.textContent = `Pain +${sess.pain - prevPain} (${prevPain}→${sess.pain})`;
+      inner.appendChild(chip);
     }
-  });
-  return events;
-}
-
-function buildAnnot(events,n,totalW){
-  const inner=document.getElementById('annotInner');
-  inner.style.width=totalW+'px';inner.innerHTML='';
-  events.forEach(ev=>{
-    const chip=document.createElement('div');
-    chip.className='ann-chip '+ev.type;
-    chip.style.left=Math.round(ev.startIdx/n*totalW)+'px';
-    chip.textContent=ev.label;chip.title=ev.label;
-    inner.appendChild(chip);
+    if (lastSessIdx != null && i - lastSessIdx > 3) {
+      const chip = document.createElement('div');
+      chip.className = 'ann-chip gap';
+      chip.style.left = Math.round((lastSessIdx + 1) * slotW) + 'px';
+      chip.textContent = `${i - lastSessIdx - 1}-day gap`;
+      inner.appendChild(chip);
+    }
+    prevPain = sess.pain;
+    lastSessIdx = i;
   });
 }
 
 /* ============================================================
-   DAY GRID LINE PLUGIN
-   Draws one vertical line per calendar day in week/month view.
-   Sundays get a darker, slightly thicker line.
-   Skipped entirely in 'all' view.
+   PLUGINS
    ============================================================ */
-const DayGridPlugin={
-  id:'dayGrid',
-  afterDraw(chart){
-    if(viewMode==='all')return;
-    const slots=chart._slots;
-    if(!slots||slots.isWeekly)return;
-    const ctx=chart.ctx;
-    const{left,right,top,bottom}=chart.chartArea;
-    const n=slots.totalCols;
-    const slotW=(right-left)/n;
+const DayGridPlugin = {
+  id: 'dayGrid',
+  afterDraw(chart) {
+    const slots = chart._slots;
+    if (!slots || slots[0]?.type !== 'day') return;
+    const ctx = chart.ctx;
+    const { left, right, top, bottom } = chart.chartArea;
+    const slotW = (right - left) / slots.length;
     ctx.save();
-    slots.dates.forEach((d,i)=>{
-      const dow=d.getDay(); // 0=Sun
-      const isSunday=dow===0;
-      const x=left+(i+1)*slotW; // line at right edge of each slot
-      if(x<left||x>right)return;
-      ctx.beginPath();
-      ctx.moveTo(x,top);
-      ctx.lineTo(x,bottom);
-      ctx.strokeStyle=isSunday?'rgba(0,0,0,0.18)':'rgba(0,0,0,0.055)';
-      ctx.lineWidth=isSunday?1.2:0.5;
+    slots.forEach((slot, i) => {
+      const isSunday = slot.date.getDay() === 0;
+      const x = left + (i + 1) * slotW;
+      if (x < left || x > right) return;
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom);
+      ctx.strokeStyle = isSunday ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.055)';
+      ctx.lineWidth = isSunday ? 1.2 : 0.5;
       ctx.stroke();
     });
     ctx.restore();
   }
 };
-Chart.register(DayGridPlugin);
+
+const CandlestickPlugin = {
+  id: 'candlestick',
+  afterDatasetsDraw(chart) {
+    if (chart.canvas.id !== 'c3') return;
+    if (zoomLevel !== '6mo' && zoomLevel !== '1yr') return;
+    const slots = chart._slots;
+    if (!slots) return;
+    const ctx = chart.ctx;
+    const { left, right } = chart.chartArea;
+    const slotW = (right - left) / slots.length;
+    const yScale = chart.scales.y;
+    ctx.save();
+    slots.forEach((slot, i) => {
+      if (!slot.pain) return;
+      const { median, q1, q3, min, max } = slot.pain;
+      const cx = left + (i + 0.5) * slotW;
+      const boxW = Math.max(6, Math.min(16, slotW * 0.4));
+      const yMed = yScale.getPixelForValue(median);
+      const yQ1  = yScale.getPixelForValue(q1);
+      const yQ3  = yScale.getPixelForValue(q3);
+      const yMin = yScale.getPixelForValue(min);
+      const yMax = yScale.getPixelForValue(max);
+      ctx.beginPath(); ctx.moveTo(cx, yMin); ctx.lineTo(cx, yMax);
+      ctx.strokeStyle = '#7B4A2D'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#7B4A2D';
+      ctx.fillRect(cx - boxW / 2, yQ3, boxW, yQ1 - yQ3);
+      ctx.beginPath(); ctx.moveTo(cx - boxW / 2, yMed); ctx.lineTo(cx + boxW / 2, yMed);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+      if (slotW >= 20) {
+        ctx.font = `600 ${Math.max(8, Math.floor(boxW * 0.55))}px DM Sans, system-ui`;
+        ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(Math.round(median)), cx, yMed);
+      }
+    });
+    ctx.restore();
+  }
+};
+
+Chart.register(DayGridPlugin, CandlestickPlugin);
 
 /* ============================================================
    CANVAS + Y-AXIS SETUP
@@ -750,158 +808,183 @@ function makeYChart(canvasId,h,yScale,tickCb){
 /* ============================================================
    RENDER
    ============================================================ */
-function render(){
-  const filter=document.getElementById('gsel').value;
-  const slots=buildSlots();
-  _slots=slots;
-  const n=slots.totalCols;
-  const{pxPer,totalW}=getGeometry(n);
+function render(slots) {
+  const n = slots.length;
+  const totalW = CHART_WIDTH;
+  const dayW = totalW / n;
+  const tickC = '#9e9c97', gridC = 'rgba(0,0,0,0.05)', restC = 'rgba(0,0,0,0.03)';
+  const gKeys = Object.keys(GCONF);
+  const isAgg = zoomLevel === '6mo' || zoomLevel === '1yr';
 
-  const tickC='#9e9c97',gridC='rgba(0,0,0,0.05)',restC='rgba(0,0,0,0.03)';
-  const gKeys=Object.keys(GCONF).filter(k=>filter==='all'||filter===k);
-
-  // Size data chart wrappers (width only — height set by prepCanvas)
-  ['w0','w2','w3','w4'].forEach(id=>{document.getElementById(id).style.width=totalW+'px';});
-
-  // Destroy existing charts
-  Object.values(charts).forEach(c=>{if(c)c.destroy();});
-  Object.values(yCharts).forEach(c=>{if(c)c.destroy();});
-
-  const sharedX={
-    ticks:{color:tickC,font:{size:10},maxRotation:pxPer<20?50:0,autoSkip:true,
-           maxTicksLimit:viewMode==='week'?7:viewMode==='month'?14:21},
-    grid:{color:gridC},
-  };
-  const sharedXng={...sharedX,grid:{display:false}};
-
-  // Y axis config shared between yChart and data chart
-  // Data chart has Y axis hidden (we show it in yChart instead)
-  const hiddenY=(yScale)=>({
-    ...yScale,
-    ticks:{display:false},
-    grid:{color:gridC},
-    border:{display:false},
+  const labels = slots.map(slot => {
+    if (slot.type === 'month') return slot.date.toLocaleDateString('en-US', { month: 'short' });
+    return slot.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   });
+
+  ['w0','w2','w3','w4'].forEach(id => { document.getElementById(id).style.width = totalW + 'px'; });
+  Object.values(charts).forEach(c => { if(c) c.destroy(); });
+  Object.values(yCharts).forEach(c => { if(c) c.destroy(); });
+
+  const sharedX = {
+    ticks: { color: tickC, font: { size: 10 }, maxRotation: dayW < 20 ? 50 : 0, autoSkip: true, maxTicksLimit: 21 },
+    grid: { color: gridC },
+  };
+  const sharedXng = { ...sharedX, grid: { display: false } };
+  const hiddenY = yScale => ({ ...yScale, ticks: { display: false }, grid: { color: gridC }, border: { display: false } });
 
   /* ---- ACCURACY ---- */
-  const accDS=gKeys.map(k=>{
-    const gk=GFIELD[k];
-    return{
-      label:GCONF[k].label,
-      data:slots.slotDays.map(days=>{
-        const wkNum=Math.floor((days[0]-START)/86400000/7)+6;
-        if(wkNum<GSTART[k])return null;
-        return aggAcc(days,gk);
+  const accDS = gKeys.map(k => {
+    const gk = GFIELD[k];
+    return {
+      label: GCONF[k].label,
+      data: slots.map(slot => {
+        if (slot.type === 'day') {
+          const sess = slot.sessions[0];
+          if (!sess || GSTART[k] > sess.wk) return null;
+          return sess[gk] ? Math.round(sess[gk].h / sess[gk].a * 100) : null;
+        }
+        const active = slot.sessions.filter(s => s[gk] && GSTART[k] <= s.wk);
+        if (!active.length) return null;
+        return Math.round(active.reduce((sum, s) => sum + s[gk].h / s[gk].a * 100, 0) / active.length);
       }),
-      borderColor:GCONF[k].color,backgroundColor:GCONF[k].color+'18',
-      borderWidth:1.5,borderDash:GCONF[k].dash,
-      pointRadius:viewMode==='week'?3:viewMode==='month'?2:4,
-      spanGaps:false,tension:0.35,
+      borderColor: GCONF[k].color, backgroundColor: GCONF[k].color + '18',
+      borderWidth: 1.5, borderDash: GCONF[k].dash,
+      pointRadius: dayW < 8 ? 2 : 4, spanGaps: true, tension: 0.35,
     };
   });
-  const accY=autoY(accDS.flatMap(ds=>ds.data));
-  yCharts[0]=makeYChart('yc0',240,accY,v=>v+'%');
-  prepCanvas('c0',totalW,240);
-  charts[0]=new Chart(document.getElementById('c0'),{
-    type:'line',data:{labels:slots.labels,datasets:accDS},
-    options:{responsive:false,maintainAspectRatio:false,animation:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:false},dayGrid:true,tooltip:{callbacks:{
-        title:items=>{const i=items[0].dataIndex;if(!slots.isWeekly){const s=SESS_MAP[slots.dates[i].toISOString().slice(0,10)];return s&&s.note?`${slots.labels[i]} — ${s.note}`:slots.labels[i];}return slots.labels[i];},
-        label:item=>item.raw!=null?` ${item.dataset.label}: ${item.raw}%`:null,
+  const accY = autoY(accDS.flatMap(ds => ds.data));
+  yCharts[0] = makeYChart('yc0', 240, accY, v => v + '%');
+  prepCanvas('c0', totalW, 240);
+  charts[0] = new Chart(document.getElementById('c0'), {
+    type: 'line', data: { labels, datasets: accDS },
+    options: { responsive: false, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, dayGrid: true, tooltip: { callbacks: {
+        title: items => { const s = slots[items[0].dataIndex]; return s.sessions[0]?.note ? `${labels[items[0].dataIndex]} — ${s.sessions[0].note}` : labels[items[0].dataIndex]; },
+        label: item => item.raw != null ? ` ${item.dataset.label}: ${item.raw}%` : null,
       }}},
-      scales:{x:sharedX,y:hiddenY(accY)}}
+      scales: { x: sharedX, y: hiddenY(accY) } }
   });
-  charts[0]._slots=slots;
+  charts[0]._slots = slots;
 
   /* ---- SPEED ---- */
-  const speedDS=gKeys.flatMap(k=>{
-    const gk=GFIELD[k];
-    const meds=[],q1s=[],q3s=[];
-    slots.slotDays.forEach(days=>{
-      const wkNum=Math.floor((days[0]-START)/86400000/7)+6;
-      if(wkNum<GSTART[k]){meds.push(null);q1s.push(null);q3s.push(null);return;}
-      const st=aggSpeed(days,gk);
-      meds.push(st?st.med:null);q1s.push(st?st.q1:null);q3s.push(st?st.q3:null);
+  const speedDS = gKeys.flatMap(k => {
+    const gk = GFIELD[k];
+    const meds = [], q1s = [], q3s = [];
+    slots.forEach(slot => {
+      if (slot.type === 'day') {
+        const sess = slot.sessions[0];
+        if (!sess || GSTART[k] > sess.wk || !sess[gk]) { meds.push(null); q1s.push(null); q3s.push(null); return; }
+        const st = speedStats(sess.si, gk, sess.pain, Math.round(sess[gk].h / sess[gk].a * 100));
+        meds.push(st.med); q1s.push(st.q1); q3s.push(st.q3);
+      } else {
+        const active = slot.sessions.filter(s => s[gk] && GSTART[k] <= s.wk);
+        if (!active.length) { meds.push(null); q1s.push(null); q3s.push(null); return; }
+        const stats = active.map(s => speedStats(s.si, gk, s.pain, Math.round(s[gk].h / s[gk].a * 100)));
+        meds.push(Math.round(stats.reduce((a,b) => a+b.med, 0) / stats.length));
+        q1s.push(Math.round(stats.reduce((a,b) => a+b.q1, 0) / stats.length));
+        q3s.push(Math.round(stats.reduce((a,b) => a+b.q3, 0) / stats.length));
+      }
     });
-    return[
-      {label:GCONF[k].label,data:meds,borderColor:GCONF[k].color,backgroundColor:'transparent',
-       borderWidth:1.5,borderDash:GCONF[k].dash,pointRadius:viewMode==='week'?3:2,spanGaps:false,tension:0.3,order:1},
-      {label:`_q1_${k}`,data:q1s,borderColor:'transparent',backgroundColor:GCONF[k].color+'28',
-       fill:'+1',pointRadius:0,spanGaps:false,tension:0.3,order:2},
-      {label:`_q3_${k}`,data:q3s,borderColor:'transparent',backgroundColor:'transparent',
-       fill:false,pointRadius:0,spanGaps:false,tension:0.3,order:2},
+    return [
+      { label: GCONF[k].label, data: meds, borderColor: GCONF[k].color, backgroundColor: 'transparent',
+        borderWidth: 1.5, borderDash: GCONF[k].dash, pointRadius: 2, spanGaps: true, tension: 0.3, order: 1 },
+      { label: `_q1_${k}`, data: q1s, borderColor: 'transparent', backgroundColor: GCONF[k].color + '28',
+        fill: '+1', pointRadius: 0, spanGaps: true, tension: 0.3, order: 2 },
+      { label: `_q3_${k}`, data: q3s, borderColor: 'transparent', backgroundColor: 'transparent',
+        fill: false, pointRadius: 0, spanGaps: true, tension: 0.3, order: 2 },
     ];
   });
-  const speedMeds=gKeys.flatMap(k=>{const gk=GFIELD[k];return slots.slotDays.map(days=>{const st=aggSpeed(days,gk);return st?st.med:null;});});
-  const speedY=autoY(speedMeds);
-  yCharts[2]=makeYChart('yc2',150,speedY);
-  prepCanvas('c2',totalW,150);
-  charts[2]=new Chart(document.getElementById('c2'),{
-    type:'line',data:{labels:slots.labels,datasets:speedDS},
-    options:{responsive:false,maintainAspectRatio:false,animation:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:false},dayGrid:true,tooltip:{filter:i=>!i.dataset.label.startsWith('_'),
-        callbacks:{title:items=>slots.labels[items[0].dataIndex],label:item=>item.raw!=null?` ${item.dataset.label}: ${item.raw}`:null}}},
-      scales:{x:sharedX,y:hiddenY(speedY)}}
+  const speedMeds = speedDS.filter(ds => !ds.label.startsWith('_')).flatMap(ds => ds.data);
+  const speedY = autoY(speedMeds);
+  yCharts[2] = makeYChart('yc2', 150, speedY);
+  prepCanvas('c2', totalW, 150);
+  charts[2] = new Chart(document.getElementById('c2'), {
+    type: 'line', data: { labels, datasets: speedDS },
+    options: { responsive: false, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, dayGrid: true, tooltip: {
+        filter: i => !i.dataset.label.startsWith('_'),
+        callbacks: { title: items => labels[items[0].dataIndex], label: item => item.raw != null ? ` ${item.dataset.label}: ${item.raw}` : null }
+      }},
+      scales: { x: sharedX, y: hiddenY(speedY) } }
   });
-  charts[2]._slots=slots;
+  charts[2]._slots = slots;
 
   /* ---- PAIN ---- */
-  const painVals=slots.slotDays.map(days=>aggPain(days));
-  const isSess=slots.slotDays.map(days=>days.some(d=>!!SESS_MAP[d.toISOString().slice(0,10)]));
-  const painY=autoY(painVals,0,10);
-  yCharts[3]=makeYChart('yc3',95,painY,v=>v);
-  prepCanvas('c3',totalW,95);
-  charts[3]=new Chart(document.getElementById('c3'),{
-    type:'bar',data:{labels:slots.labels,datasets:[{label:'Pain',data:painVals,
-      backgroundColor:painVals.map(p=>p==null?restC:p>=7?'#E24B4A99':p>=5?'#EF9F2799':'#1D9E7599'),
-      borderColor:painVals.map(p=>p==null?'transparent':p>=7?'#E24B4A':p>=5?'#BA7517':'#0F6E56'),
-      borderWidth:1,borderRadius:2}]},
-    options:{responsive:false,maintainAspectRatio:false,animation:false,
-      plugins:{legend:{display:false},dayGrid:true,tooltip:{callbacks:{title:i=>slots.labels[i[0].dataIndex],label:i=>i.raw!=null?` Pain: ${i.raw}/10`:' No session'}}},
-      scales:{x:sharedXng,y:hiddenY(painY)}}
+  const painVals = isAgg
+    ? slots.map(slot => slot.pain ? slot.pain.median : null)
+    : slots.map(slot => slot.sessions[0]?.pain ?? null);
+  const painRangeVals = isAgg
+    ? slots.flatMap(slot => slot.pain ? [slot.pain.min, slot.pain.max] : [])
+    : painVals;
+  const painY = autoY(painRangeVals, 0, 10);
+  yCharts[3] = makeYChart('yc3', 95, painY, v => v);
+  prepCanvas('c3', totalW, 95);
+  charts[3] = new Chart(document.getElementById('c3'), {
+    type: 'bar', data: { labels, datasets: [{ label: 'Pain', data: painVals,
+      backgroundColor: isAgg ? painVals.map(() => 'transparent') : painVals.map(p => p == null ? restC : p >= 7 ? '#E24B4A99' : p >= 5 ? '#EF9F2799' : '#1D9E7599'),
+      borderColor: isAgg ? painVals.map(() => 'transparent') : painVals.map(p => p == null ? 'transparent' : p >= 7 ? '#E24B4A' : p >= 5 ? '#BA7517' : '#0F6E56'),
+      borderWidth: 1, borderRadius: 2 }]},
+    options: { responsive: false, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false }, dayGrid: !isAgg, candlestick: isAgg, tooltip: { callbacks: {
+        title: i => labels[i[0].dataIndex],
+        label: i => i.raw != null ? ` Pain: ${i.raw}/10` : ' No session',
+      }}},
+      scales: { x: sharedXng, y: hiddenY(painY) } }
   });
-  charts[3]._slots=slots;
+  charts[3]._slots = slots;
 
   /* ---- MINUTES ---- */
-  const minsVals=slots.slotDays.map(days=>aggMins(days));
-  const minsY=autoY(minsVals,0,null,2);
-  yCharts[4]=makeYChart('yc4',95,minsY,v=>v+'m');
-  prepCanvas('c4',totalW,95);
-  charts[4]=new Chart(document.getElementById('c4'),{
-    type:'bar',data:{labels:slots.labels,datasets:[{label:'Minutes',data:minsVals,
-      backgroundColor:minsVals.map((m,i)=>!isSess[i]&&!slots.isWeekly?restC:m>=20?'#1D9E7599':m>=14?'#378ADD66':'#D4537E66'),
-      borderColor:minsVals.map((m,i)=>!isSess[i]&&!slots.isWeekly?'transparent':m>=20?'#1D9E75':m>=14?'#378ADD':'#D4537E'),
-      borderWidth:1,borderRadius:2}]},
-    options:{responsive:false,maintainAspectRatio:false,animation:false,
-      plugins:{legend:{display:false},dayGrid:true,tooltip:{callbacks:{title:i=>slots.labels[i[0].dataIndex],label:i=>!isSess[i[0].dataIndex]&&!slots.isWeekly?' No session':` ${i.raw} min`}}},
-      scales:{x:sharedXng,y:hiddenY(minsY)}}
+  const minsVals = slots.map(slot => slot.type === 'day' ? (slot.sessions[0]?.mins || 0) : (slot.minutes || 0));
+  const hasSess = slots.map(slot => slot.sessions.length > 0);
+  const minsY = autoY(minsVals, 0, null, 2);
+  yCharts[4] = makeYChart('yc4', 95, minsY, v => v + 'm');
+  prepCanvas('c4', totalW, 95);
+  charts[4] = new Chart(document.getElementById('c4'), {
+    type: 'bar', data: { labels, datasets: [{ label: 'Minutes', data: minsVals,
+      backgroundColor: minsVals.map((m, i) => !hasSess[i] ? restC : m >= 20 ? '#1D9E7599' : m >= 14 ? '#378ADD66' : '#D4537E66'),
+      borderColor: minsVals.map((m, i) => !hasSess[i] ? 'transparent' : m >= 20 ? '#1D9E75' : m >= 14 ? '#378ADD' : '#D4537E'),
+      borderWidth: 1, borderRadius: 2 }]},
+    options: { responsive: false, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false }, dayGrid: true, tooltip: { callbacks: {
+        title: i => labels[i[0].dataIndex],
+        label: i => hasSess[i[0].dataIndex] ? ` ${i.raw} min` : ' No session',
+      }}},
+      scales: { x: sharedXng, y: hiddenY(minsY) } }
   });
-  charts[4]._slots=slots;
+  charts[4]._slots = slots;
 
   /* ---- ANNOTATIONS ---- */
-  buildAnnot(detectEvents(slots),n,totalW);
+  buildAnnotFromSlots(slots, totalW);
 
   /* ---- LEGEND ---- */
-  document.getElementById('leg0').innerHTML=gKeys.map(k=>{
-    const c=GCONF[k];
-    const bg=c.dash.length?'transparent':c.color;
-    const bi=c.dash.length?`repeating-linear-gradient(90deg,${c.color} 0,${c.color} 6px,transparent 6px,transparent 9px)`:'';
-    const added=k!=='extension'&&k!=='hook'?`<span class="leg-note">(from W${GSTART[k]})</span>`:'';
-    return`<span class="leg-item"><span class="leg-dash" style="background:${bg};${bi?'background-image:'+bi:''}"></span>${c.label} ${added}</span>`;
+  document.getElementById('leg0').innerHTML = gKeys.map(k => {
+    const c = GCONF[k];
+    const bg = c.dash.length ? 'transparent' : c.color;
+    const bi = c.dash.length ? `repeating-linear-gradient(90deg,${c.color} 0,${c.color} 6px,transparent 6px,transparent 9px)` : '';
+    const added = k !== 'extension' && k !== 'hook' ? `<span class="leg-note">(from W${GSTART[k]})</span>` : '';
+    return `<span class="leg-item"><span class="leg-dash" style="background:${bg};${bi ? 'background-image:'+bi : ''}"></span>${c.label} ${added}</span>`;
   }).join('');
 
-  /* ---- SYNC SCROLL (scroll areas only — Y panels stay fixed) ---- */
-  const scrollers=['annotScroll','s0','s2','s3','s4'].map(id=>document.getElementById(id));
-  scrollers.forEach(o=>{
-    o.onscroll=()=>scrollers.forEach(x=>{if(x!==o)x.scrollLeft=o.scrollLeft;});
-  });
+  /* ---- SYNC SCROLL ---- */
+  const scrollers = ['annotScroll','s0','s2','s3','s4'].map(id => document.getElementById(id));
+  scrollers.forEach(o => { o.onscroll = () => scrollers.forEach(x => { if(x !== o) x.scrollLeft = o.scrollLeft; }); });
 
-  setTimeout(snapToRecent,150);
+  setTimeout(snapToRecent, 150);
 }
 
-render();
+// Initialize zoom state from session data
+const _lastDate  = sessDate(SESS_RAW[SESS_RAW.length - 1]);
+const _firstDate = sessDate(SESS_RAW[0]);
+const _therapyDays = Math.round((_lastDate - _firstDate) / 86400000);
+const _availableZooms = getAvailableZooms(_therapyDays);
+renderZoomButtons(_availableZooms);
+windowEnd  = new Date(_lastDate);
+zoomLevel  = defaultZoom(_availableZooms);
+setActiveZoomButton(zoomLevel);
+
+draw();
 </script>
 </body>
 </html>
