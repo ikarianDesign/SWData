@@ -379,6 +379,7 @@ select {
 const START = new Date(2024,0,8);
 const TOTAL_DAYS = 21*7;
 const YAXIS_W = 48; // must match CSS --yaxis-w
+const CHART_WIDTH = 1000; // px, fixed for prototype
 
 const GCONF = {
   extension: {label:'Extension',   color:'#378ADD', dash:[]},
@@ -499,7 +500,44 @@ function aggMins(days){return days.reduce((acc,d)=>{const s=SESS_MAP[d.toISOStri
 /* ============================================================
    VIEW STATE
    ============================================================ */
-let viewMode='all', axisMode='week';
+let zoomLevel  = '1mo';
+let windowEnd  = null;
+let windowStart = null;
+
+function getAvailableZooms(therapyDays) {
+  const zooms = ['1mo'];
+  if (therapyDays >= 42)  zooms.push('3mo');
+  if (therapyDays >= 70)  zooms.push('6mo');
+  if (therapyDays >= 112) zooms.push('1yr');
+  return zooms;
+}
+
+function defaultZoom(availableZooms) {
+  if (availableZooms.includes('3mo')) return '3mo';
+  return '1mo';
+}
+
+function deriveWindowStart(end, zoom) {
+  switch(zoom) {
+    case '1mo': return addDays(end, -27);
+    case '3mo': return addDays(end, -83);
+    case '6mo': return addDays(end, -167);
+    case '1yr': return addDays(end, -364);
+  }
+}
+
+function painStats(sessions) {
+  const values = sessions.map(s => s.pain).sort((a, b) => a - b);
+  const n = values.length;
+  if (n === 0) return null;
+  if (n === 1) return { median: values[0], min: values[0], max: values[0], q1: values[0], q3: values[0] };
+  const median = n % 2 === 0
+    ? (values[n/2 - 1] + values[n/2]) / 2
+    : values[Math.floor(n/2)];
+  const q1 = values[Math.floor(n * 0.25)];
+  const q3 = values[Math.floor(n * 0.75)];
+  return { median, min: values[0], max: values[n-1], q1, q3 };
+}
 
 function setView(m,btn){
   viewMode=m;
@@ -862,12 +900,6 @@ function render(){
 
   setTimeout(snapToRecent,150);
 }
-
-/* ============================================================
-   RESIZE OBSERVER
-   ============================================================ */
-const ro=new ResizeObserver(()=>render());
-ro.observe(document.getElementById('s0'));
 
 render();
 </script>
