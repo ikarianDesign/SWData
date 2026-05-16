@@ -89,27 +89,6 @@ button { font-family: var(--font); cursor: pointer; }
 }
 .seg button:hover { border-color: var(--text-pri); }
 .seg button.active { background: var(--text-pri); color: #fff; border-color: var(--text-pri); }
-select {
-  font-family: var(--font); font-size: 12px;
-  padding: 5px 10px; border-radius: var(--radius-sm);
-  border: 0.5px solid var(--border-md);
-  background: var(--surface); color: var(--text-pri);
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b6860' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 8px center; padding-right: 24px;
-}
-.vis-toggle-group { display: flex; gap: 4px; align-items: center; }
-.vis-toggle-group .vtlabel { font-size: 11px; color: var(--text-ter); margin-right: 2px; text-transform: uppercase; letter-spacing:.04em; }
-.lane-pill {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 8px; border-radius: 20px; font-size: 11px;
-  border: 0.5px solid var(--border-md);
-  background: var(--surface); color: var(--text-sec);
-  cursor: pointer; transition: all .12s; user-select: none;
-}
-.lane-pill.on { background: var(--text-pri); color: #fff; border-color: var(--text-pri); }
-.lane-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity:.7; }
-
 /* ============================================================
    DASHBOARD
    ============================================================ */
@@ -173,41 +152,26 @@ select {
 
 .chart-wrap { position: relative; overflow: hidden; }
 
-/* Annotation lane — also split into sticky-left spacer + scrollable */
-.annot-body {
+/* Shared x-axis header row (above all chart lanes) */
+.chart-header-row {
   display: flex;
   width: 100%;
-  overflow: hidden;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  margin-bottom: 10px;
 }
-.annot-spacer {
+.yaxis-spacer-h {
   flex-shrink: 0;
   width: var(--yaxis-w);
-  background: var(--surface);
   border-right: 0.5px solid var(--border);
+  background: var(--surface);
 }
-.annot-scroll { flex: 1; overflow-x: auto; overflow-y: hidden; position: relative; }
-.annot-scroll::-webkit-scrollbar { height: 3px; }
-.annot-scroll::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 2px; }
-.annot-inner { position: relative; height: 28px; }
-.ann-chip {
-  position: absolute; top: 3px; height: 22px;
-  border-radius: var(--radius-sm);
-  display: flex; align-items: center; padding: 0 7px;
-  font-size: 10px; font-weight: 600; white-space: nowrap;
-  cursor: default; border: 0.5px solid;
-}
-.ann-chip.pain { background:#FCEBEB; color:#791F1F; border-color:#F09595; }
-.ann-chip.gap  { background:#FAEEDA; color:#633806; border-color:#EF9F27; }
 
 /* Legend */
 .legend { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 14px 0; }
 .leg-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-sec); }
 .leg-dash { width: 14px; height: 3px; border-radius: 2px; }
 .leg-note { font-size: 10px; color: var(--text-ter); }
-
-.ann-legend { display: flex; gap: 14px; padding: 6px 14px 8px; }
-.ann-leg-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-sec); }
-.ann-leg-dot { width: 8px; height: 8px; border-radius: 2px; }
 
 /* Footer */
 .dash-footer {
@@ -261,22 +225,12 @@ select {
 <!-- DASHBOARD -->
 <div class="dashboard">
 
-  <!-- EVENTS -->
-  <div class="lane" id="laneEvents">
-    <div class="lane-header" onclick="collapseLane('laneEvents')">
-      <span class="lane-title">Significant events</span>
-      <span class="lane-chevron">▾</span>
-    </div>
-    <div class="lane-body">
-      <div class="ann-legend" style="padding-left:calc(var(--yaxis-w) + 14px);">
-        <span class="ann-leg-item"><span class="ann-leg-dot" style="background:#F09595;border:0.5px solid #E24B4A;"></span>Pain spike (+3 pts)</span>
-        <span class="ann-leg-item"><span class="ann-leg-dot" style="background:#EF9F27;border:0.5px solid #BA7517;"></span>Gap in play (3+ days)</span>
-      </div>
-    </div>
-    <div class="annot-body" id="annotBody">
-      <div class="annot-spacer"></div>
-      <div class="annot-scroll" id="annotScroll">
-        <div class="annot-inner" id="annotInner"></div>
+  <!-- X-AXIS HEADER (shared across all charts) -->
+  <div class="chart-header-row">
+    <div class="yaxis-spacer-h"></div>
+    <div class="chart-scroll" id="sHeader">
+      <div class="chart-wrap" id="wHeader">
+        <canvas id="cHeader" aria-label="X axis header"></canvas>
       </div>
     </div>
   </div>
@@ -295,21 +249,6 @@ select {
       <div class="yaxis-panel"><canvas id="yc0"></canvas></div>
       <div class="chart-scroll" id="s0">
         <div class="chart-wrap" id="w0"><canvas id="c0" aria-label="Gesture accuracy"></canvas></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- SPEED -->
-  <div class="lane" id="laneSpeed">
-    <div class="lane-header" onclick="collapseLane('laneSpeed')">
-      <span class="lane-title">Speed score</span>
-      <span class="lane-subtitle">&nbsp;— normalized 0–100, higher=faster · band=IQR</span>
-      <span class="lane-chevron">▾</span>
-    </div>
-    <div class="lane-body" id="laneBodySpd">
-      <div class="yaxis-panel"><canvas id="yc2"></canvas></div>
-      <div class="chart-scroll" id="s2">
-        <div class="chart-wrap" id="w2"><canvas id="c2" aria-label="Speed score"></canvas></div>
       </div>
     </div>
   </div>
@@ -350,7 +289,7 @@ select {
   <span class="min-key"><span class="swatch" style="background:#1D9E75;"></span>20+ min</span>
   <span class="min-key"><span class="swatch" style="background:#378ADD;"></span>14–19 min</span>
   <span class="min-key"><span class="swatch" style="background:#D4537E;"></span>&lt;14 min</span>
-  <span style="margin-left:8px;">Week/Month: scroll right for recent. Darker lines = Sundays.</span>
+  <span style="margin-left:8px;">Scroll right for most recent. Darker lines mark week/month/quarter boundaries.</span>
 </div>
 
 <script>
@@ -437,46 +376,6 @@ function autoY(vals,hardMin=0,hardMax=100,pad=5){
 
 const SESS_MAP={};
 SESS_RAW.forEach((s,si)=>{SESS_MAP[sessDate(s).toISOString().slice(0,10)]={...s,si};});
-
-function allDates(){const a=[];for(let i=0;i<TOTAL_DAYS;i++)a.push(addDays(START,i));return a;}
-
-function weekBuckets(){
-  const b=[];
-  for(let w=6;w<=26;w++){
-    const days=[];
-    for(let d=1;d<=7;d++){const off=(w-6)*7+(d-1);if(off<TOTAL_DAYS)days.push(addDays(START,off));}
-    b.push({wk:w,days,label:`W${w}`,date:days[0]});
-  }
-  return b;
-}
-
-/* ============================================================
-   SPEED STATS (quality removed)
-   ============================================================ */
-function speedStats(si,gk,pain,acc){
-  const prog=Math.min(1,si/41),pp=pain>=7?18:pain>=5?10:0;
-  const bases={ff:15,cf:18,tb:20,hk:22,ext:25};
-  const gains={ff:52,cf:54,tb:52,hk:50,ext:48};
-  const bm=clamp((bases[gk]||20)+prog*(gains[gk]||50)-pp+(acc-50)*.15,5,95);
-  const spr=Math.max(4,28-prog*18+pp*.4);
-  return{med:Math.round(bm),q1:Math.max(2,Math.round(bm-spr*.7)),q3:Math.min(98,Math.round(bm+spr*.5))};
-}
-
-function aggAcc(days,gk){
-  const v=days.map(d=>{const s=SESS_MAP[d.toISOString().slice(0,10)];return s&&s[gk]?Math.round(s[gk].h/s[gk].a*100):null;}).filter(x=>x!=null);
-  return v.length?arrAvg(v):null;
-}
-function aggSpeed(days,gk){
-  const sess=days.map(d=>SESS_MAP[d.toISOString().slice(0,10)]).filter(s=>s&&s[gk]);
-  if(!sess.length)return null;
-  const stats=sess.map(s=>speedStats(s.si,gk,s.pain,Math.round(s[gk].h/s[gk].a*100)));
-  return{med:arrAvg(stats.map(s=>s.med)),q1:arrAvg(stats.map(s=>s.q1)),q3:arrAvg(stats.map(s=>s.q3))};
-}
-function aggPain(days){
-  const v=days.map(d=>{const s=SESS_MAP[d.toISOString().slice(0,10)];return s?s.pain:null;}).filter(x=>x!=null);
-  return v.length?arrAvg(v):null;
-}
-function aggMins(days){return days.reduce((acc,d)=>{const s=SESS_MAP[d.toISOString().slice(0,10)];return acc+(s?s.mins:0);},0);}
 
 /* ============================================================
    VIEW STATE
@@ -644,65 +543,71 @@ function draw() {
 }
 
 function snapToRecent(){
-  ['annotScroll','s0','s2','s3','s4'].forEach(id=>{
+  ['sHeader','s0','s3','s4'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.scrollLeft=el.scrollWidth;
   });
 }
 
 /* ============================================================
-   ANNOTATIONS
-   ============================================================ */
-function buildAnnotFromSlots(slots, totalW) {
-  const inner = document.getElementById('annotInner');
-  inner.style.width = totalW + 'px';
-  inner.innerHTML = '';
-  if (zoomLevel !== '1mo' && zoomLevel !== '3mo') return;
-  const slotW = totalW / slots.length;
-  let prevPain = null, lastSessIdx = null;
-  slots.forEach((slot, i) => {
-    const sess = slot.sessions[0];
-    if (!sess) return;
-    if (prevPain != null && sess.pain - prevPain >= 3) {
-      const chip = document.createElement('div');
-      chip.className = 'ann-chip pain';
-      chip.style.left = Math.round(i * slotW) + 'px';
-      chip.textContent = `Pain +${sess.pain - prevPain} (${prevPain}→${sess.pain})`;
-      inner.appendChild(chip);
-    }
-    if (lastSessIdx != null && i - lastSessIdx > 3) {
-      const chip = document.createElement('div');
-      chip.className = 'ann-chip gap';
-      chip.style.left = Math.round((lastSessIdx + 1) * slotW) + 'px';
-      chip.textContent = `${i - lastSessIdx - 1}-day gap`;
-      inner.appendChild(chip);
-    }
-    prevPain = sess.pain;
-    lastSessIdx = i;
-  });
-}
-
-/* ============================================================
    PLUGINS
    ============================================================ */
-const DayGridPlugin = {
-  id: 'dayGrid',
-  afterDraw(chart) {
+const ColumnBgPlugin = {
+  id: 'columnBg',
+  beforeDatasetsDraw(chart) {
     const slots = chart._slots;
-    if (!slots || slots[0]?.type !== 'day') return;
-    const ctx = chart.ctx;
+    if (!slots) return;
+    const { ctx } = chart;
     const { left, right, top, bottom } = chart.chartArea;
     const slotW = (right - left) / slots.length;
-    ctx.save();
+
     slots.forEach((slot, i) => {
-      const isSunday = slot.date.getDay() === 0;
-      const x = left + (i + 1) * slotW;
-      if (x < left || x > right) return;
-      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom);
-      ctx.strokeStyle = isSunday ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.055)';
-      ctx.lineWidth = isSunday ? 1.2 : 0.5;
-      ctx.stroke();
+      let band;
+      if      (zoomLevel === '1mo') band = slot.date.getDay() % 2;
+      else if (zoomLevel === '3mo') band = (slot.date.getFullYear() * 12 + slot.date.getMonth()) % 2;
+      else if (zoomLevel === '6mo') band = (slot.date.getFullYear() * 12 + slot.date.getMonth()) % 2;
+      else                          band = slot.date.getFullYear() % 2;
+      if (band === 1) {
+        ctx.fillStyle = 'rgba(0,0,0,0.03)';
+        ctx.fillRect(left + i * slotW, top, slotW, bottom - top);
+      }
     });
+
+    const yScale = chart.scales.y;
+    if (yScale?.ticks?.length) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([3, 3]);
+      yScale.ticks.forEach(tick => {
+        const y = yScale.getPixelForValue(tick.value);
+        ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  },
+
+  afterDatasetsDraw(chart) {
+    const slots = chart._slots;
+    if (!slots) return;
+    const { ctx } = chart;
+    const { left, right, top, bottom } = chart.chartArea;
+    const slotW = (right - left) / slots.length;
+
+    ctx.save();
+    for (let i = 0; i < slots.length - 1; i++) {
+      const x = left + (i + 1) * slotW;
+      let isDark = false;
+      if      (zoomLevel === '1mo') isDark = slots[i + 1].date.getDay() === 0;
+      else if (zoomLevel === '3mo') isDark = slots[i].date.getMonth() !== slots[i + 1].date.getMonth();
+      else if (zoomLevel === '6mo') isDark = slots[i].date.getMonth() !== slots[i + 1].date.getMonth();
+      else                          isDark = slots[i + 1].date.getMonth() % 3 === 0;
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom);
+      ctx.strokeStyle = isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.055)';
+      ctx.lineWidth   = isDark ? 1 : 0.5;
+      ctx.stroke();
+    }
     ctx.restore();
   }
 };
@@ -745,7 +650,7 @@ const CandlestickPlugin = {
   }
 };
 
-Chart.register(DayGridPlugin, CandlestickPlugin);
+Chart.register(ColumnBgPlugin, CandlestickPlugin);
 
 /* ============================================================
    CANVAS + Y-AXIS SETUP
@@ -774,7 +679,7 @@ function prepYCanvas(id,h){
 // charts[2]=speed data, etc. (index matches chart id number)
 const charts={};
 const yCharts={};
-let _slots=null; // shared reference for DayGridPlugin
+let _slots=null; // shared reference for plugins
 
 /* ============================================================
    Y-AXIS CHART FACTORY
@@ -806,6 +711,104 @@ function makeYChart(canvasId,h,yScale,tickCb){
 }
 
 /* ============================================================
+   X-AXIS HEADER
+   ============================================================ */
+function drawXHeader(slots, zoom, totalW) {
+  const H = 40, ROW1 = 18;
+  const canvas = document.getElementById('cHeader');
+  canvas.width = totalW; canvas.height = H;
+  canvas.style.width = totalW + 'px'; canvas.style.height = H + 'px';
+  if (canvas.parentElement) canvas.parentElement.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, totalW, H);
+  const slotW = totalW / slots.length;
+  const SEC = '#6b6860', TER = '#9e9c97';
+  const DAY2 = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  // Column bands (same parity logic as chart body)
+  slots.forEach((slot, i) => {
+    let band;
+    if      (zoom === '1mo') band = slot.date.getDay() % 2;
+    else if (zoom === '3mo') band = (slot.date.getFullYear() * 12 + slot.date.getMonth()) % 2;
+    else if (zoom === '6mo') band = (slot.date.getFullYear() * 12 + slot.date.getMonth()) % 2;
+    else                     band = slot.date.getFullYear() % 2;
+    if (band === 1) { ctx.fillStyle = 'rgba(0,0,0,0.03)'; ctx.fillRect(i * slotW, 0, slotW, H); }
+  });
+
+  // Row 1: top labels
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.font = '500 11px DM Sans, system-ui';
+  ctx.fillStyle = SEC;
+  const r1y = ROW1 * 0.54;
+
+  if (zoom === '1mo') {
+    slots.forEach((slot, i) => {
+      if (slot.date.getDay() !== 0) return;
+      ctx.fillText(slot.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), i * slotW + 3, r1y);
+    });
+  } else if (zoom === '3mo' || zoom === '6mo') {
+    let lastM = -1;
+    slots.forEach((slot, i) => {
+      const m = slot.date.getMonth();
+      if (m !== lastM) {
+        ctx.fillText(slot.date.toLocaleDateString('en-US', { month: 'long' }), i * slotW + 3, r1y);
+        lastM = m;
+      }
+    });
+  } else {
+    let lastY = -1;
+    slots.forEach((slot, i) => {
+      const y = slot.date.getFullYear();
+      if (y !== lastY) { ctx.fillText(String(y), i * slotW + 3, r1y); lastY = y; }
+    });
+  }
+
+  // Row 1/2 separator
+  ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(0, ROW1); ctx.lineTo(totalW, ROW1); ctx.stroke();
+
+  // Row 2: bottom labels
+  ctx.font = '400 10px DM Sans, system-ui';
+  ctx.fillStyle = TER;
+  ctx.textAlign = 'center';
+  const r2y = ROW1 + (H - ROW1) * 0.54;
+
+  if (zoom === '1mo') {
+    slots.forEach((slot, i) => {
+      ctx.fillText(DAY2[slot.date.getDay()], i * slotW + slotW / 2, r2y);
+    });
+  } else if (zoom === '3mo') {
+    slots.forEach((slot, i) => {
+      if (slot.date.getDay() !== 0) return;
+      ctx.fillText(String(slot.date.getDate()), i * slotW + slotW / 2, r2y);
+    });
+  } else if (zoom === '6mo') {
+    slots.forEach((slot, i) => {
+      ctx.fillText(slot.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), i * slotW + slotW / 2, r2y);
+    });
+  } else {
+    slots.forEach((slot, i) => {
+      ctx.fillText(slot.date.toLocaleDateString('en-US', { month: 'short' }), i * slotW + slotW / 2, r2y);
+    });
+  }
+
+  // Column separator lines through both rows
+  ctx.lineWidth = 0.5;
+  for (let i = 1; i < slots.length; i++) {
+    const x = i * slotW;
+    let isDark = false;
+    if      (zoom === '1mo') isDark = slots[i].date.getDay() === 0;
+    else if (zoom === '3mo') isDark = slots[i - 1].date.getMonth() !== slots[i].date.getMonth();
+    else if (zoom === '6mo') isDark = slots[i - 1].date.getMonth() !== slots[i].date.getMonth();
+    else                     isDark = slots[i].date.getMonth() % 3 === 0;
+    ctx.strokeStyle = isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.055)';
+    ctx.lineWidth = isDark ? 1 : 0.5;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+}
+
+/* ============================================================
    RENDER
    ============================================================ */
 function render(slots) {
@@ -821,16 +824,11 @@ function render(slots) {
     return slot.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   });
 
-  ['w0','w2','w3','w4'].forEach(id => { document.getElementById(id).style.width = totalW + 'px'; });
+  ['w0','w3','w4','wHeader'].forEach(id => { document.getElementById(id).style.width = totalW + 'px'; });
   Object.values(charts).forEach(c => { if(c) c.destroy(); });
   Object.values(yCharts).forEach(c => { if(c) c.destroy(); });
 
-  const sharedX = {
-    ticks: { color: tickC, font: { size: 10 }, maxRotation: dayW < 20 ? 50 : 0, autoSkip: true, maxTicksLimit: 21 },
-    grid: { color: gridC },
-  };
-  const sharedXng = { ...sharedX, grid: { display: false } };
-  const hiddenY = yScale => ({ ...yScale, ticks: { display: false }, grid: { color: gridC }, border: { display: false } });
+  const hiddenY = yScale => ({ ...yScale, display: false });
 
   /* ---- ACCURACY ---- */
   const accDS = gKeys.map(k => {
@@ -858,58 +856,15 @@ function render(slots) {
   charts[0] = new Chart(document.getElementById('c0'), {
     type: 'line', data: { labels, datasets: accDS },
     options: { responsive: false, maintainAspectRatio: false, animation: false,
+      layout: { padding: { top: 6, bottom: 0 } },
       interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: false }, dayGrid: true, tooltip: { callbacks: {
+      plugins: { legend: { display: false }, columnBg: true, tooltip: { callbacks: {
         title: items => { const s = slots[items[0].dataIndex]; return s.sessions[0]?.note ? `${labels[items[0].dataIndex]} — ${s.sessions[0].note}` : labels[items[0].dataIndex]; },
         label: item => item.raw != null ? ` ${item.dataset.label}: ${item.raw}%` : null,
       }}},
-      scales: { x: sharedX, y: hiddenY(accY) } }
+      scales: { x: { display: false }, y: hiddenY(accY) } }
   });
   charts[0]._slots = slots;
-
-  /* ---- SPEED ---- */
-  const speedDS = gKeys.flatMap(k => {
-    const gk = GFIELD[k];
-    const meds = [], q1s = [], q3s = [];
-    slots.forEach(slot => {
-      if (slot.type === 'day') {
-        const sess = slot.sessions[0];
-        if (!sess || GSTART[k] > sess.wk || !sess[gk]) { meds.push(null); q1s.push(null); q3s.push(null); return; }
-        const st = speedStats(sess.si, gk, sess.pain, Math.round(sess[gk].h / sess[gk].a * 100));
-        meds.push(st.med); q1s.push(st.q1); q3s.push(st.q3);
-      } else {
-        const active = slot.sessions.filter(s => s[gk] && GSTART[k] <= s.wk);
-        if (!active.length) { meds.push(null); q1s.push(null); q3s.push(null); return; }
-        const stats = active.map(s => speedStats(s.si, gk, s.pain, Math.round(s[gk].h / s[gk].a * 100)));
-        meds.push(Math.round(stats.reduce((a,b) => a+b.med, 0) / stats.length));
-        q1s.push(Math.round(stats.reduce((a,b) => a+b.q1, 0) / stats.length));
-        q3s.push(Math.round(stats.reduce((a,b) => a+b.q3, 0) / stats.length));
-      }
-    });
-    return [
-      { label: GCONF[k].label, data: meds, borderColor: GCONF[k].color, backgroundColor: 'transparent',
-        borderWidth: 1.5, borderDash: GCONF[k].dash, pointRadius: 2, spanGaps: true, tension: 0.3, order: 1 },
-      { label: `_q1_${k}`, data: q1s, borderColor: 'transparent', backgroundColor: GCONF[k].color + '28',
-        fill: '+1', pointRadius: 0, spanGaps: true, tension: 0.3, order: 2 },
-      { label: `_q3_${k}`, data: q3s, borderColor: 'transparent', backgroundColor: 'transparent',
-        fill: false, pointRadius: 0, spanGaps: true, tension: 0.3, order: 2 },
-    ];
-  });
-  const speedMeds = speedDS.filter(ds => !ds.label.startsWith('_')).flatMap(ds => ds.data);
-  const speedY = autoY(speedMeds);
-  yCharts[2] = makeYChart('yc2', 150, speedY);
-  prepCanvas('c2', totalW, 150);
-  charts[2] = new Chart(document.getElementById('c2'), {
-    type: 'line', data: { labels, datasets: speedDS },
-    options: { responsive: false, maintainAspectRatio: false, animation: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: false }, dayGrid: true, tooltip: {
-        filter: i => !i.dataset.label.startsWith('_'),
-        callbacks: { title: items => labels[items[0].dataIndex], label: item => item.raw != null ? ` ${item.dataset.label}: ${item.raw}` : null }
-      }},
-      scales: { x: sharedX, y: hiddenY(speedY) } }
-  });
-  charts[2]._slots = slots;
 
   /* ---- PAIN ---- */
   const painVals = isAgg
@@ -927,11 +882,12 @@ function render(slots) {
       borderColor: isAgg ? painVals.map(() => 'transparent') : painVals.map(p => p == null ? 'transparent' : p >= 7 ? '#E24B4A' : p >= 5 ? '#BA7517' : '#0F6E56'),
       borderWidth: 1, borderRadius: 2 }]},
     options: { responsive: false, maintainAspectRatio: false, animation: false,
-      plugins: { legend: { display: false }, dayGrid: !isAgg, candlestick: isAgg, tooltip: { callbacks: {
+      layout: { padding: { top: 6, bottom: 0 } },
+      plugins: { legend: { display: false }, columnBg: true, candlestick: isAgg, tooltip: { callbacks: {
         title: i => labels[i[0].dataIndex],
         label: i => i.raw != null ? ` Pain: ${i.raw}/10` : ' No session',
       }}},
-      scales: { x: sharedXng, y: hiddenY(painY) } }
+      scales: { x: { display: false }, y: hiddenY(painY) } }
   });
   charts[3]._slots = slots;
 
@@ -947,16 +903,14 @@ function render(slots) {
       borderColor: minsVals.map((m, i) => !hasSess[i] ? 'transparent' : m >= 20 ? '#1D9E75' : m >= 14 ? '#378ADD' : '#D4537E'),
       borderWidth: 1, borderRadius: 2 }]},
     options: { responsive: false, maintainAspectRatio: false, animation: false,
-      plugins: { legend: { display: false }, dayGrid: true, tooltip: { callbacks: {
+      layout: { padding: { top: 6, bottom: 0 } },
+      plugins: { legend: { display: false }, columnBg: true, tooltip: { callbacks: {
         title: i => labels[i[0].dataIndex],
         label: i => hasSess[i[0].dataIndex] ? ` ${i.raw} min` : ' No session',
       }}},
-      scales: { x: sharedXng, y: hiddenY(minsY) } }
+      scales: { x: { display: false }, y: hiddenY(minsY) } }
   });
   charts[4]._slots = slots;
-
-  /* ---- ANNOTATIONS ---- */
-  buildAnnotFromSlots(slots, totalW);
 
   /* ---- LEGEND ---- */
   document.getElementById('leg0').innerHTML = gKeys.map(k => {
@@ -967,8 +921,11 @@ function render(slots) {
     return `<span class="leg-item"><span class="leg-dash" style="background:${bg};${bi ? 'background-image:'+bi : ''}"></span>${c.label} ${added}</span>`;
   }).join('');
 
+  /* ---- X-AXIS HEADER ---- */
+  drawXHeader(slots, zoomLevel, totalW);
+
   /* ---- SYNC SCROLL ---- */
-  const scrollers = ['annotScroll','s0','s2','s3','s4'].map(id => document.getElementById(id));
+  const scrollers = ['sHeader','s0','s3','s4'].map(id => document.getElementById(id));
   scrollers.forEach(o => { o.onscroll = () => scrollers.forEach(x => { if(x !== o) x.scrollLeft = o.scrollLeft; }); });
 
   setTimeout(snapToRecent, 150);
